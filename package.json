@@ -26,7 +26,7 @@
     "lib",
     "skills",
     "astrbot_plugin_dsh",
-    "docs",
+    "docs/design-notes.md",
     "test",
     "cordis.patch.yml",
     "README.md",

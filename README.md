@@ -148,7 +148,7 @@ DSH 反问（`ask_user_question`，含 plan 模式的计划确认）也会发到
 npm test        # node:test，跑 lib/pure.js 的纯函数单测
 ```
 
-纯逻辑（分块、`[SEND_FILE]` 解析、消息抽取、路径校验、过程汇报文案）全在 `lib/pure.js`，与 cordis / 宿主无关，可直接单测；`lib/index.js` 只放插件装配与 I/O。改动记录见 [`CHANGELOG.md`](CHANGELOG.md)，实现取舍与排障笔记见 [`docs/design-notes.md`](docs/design-notes.md)。
+纯逻辑（分块、`[SEND_FILE]` 解析、消息抽取、路径校验、过程汇报文案）全在 `lib/pure.js`，与 cordis / 宿主无关，可直接单测；`lib/index.js` 只放插件装配与 I/O。改动记录见 [CHANGELOG.md](https://github.com/CCYellowStar2/dsh-astrbot-ingress/blob/main/CHANGELOG.md)，实现取舍与排障笔记见 [docs/design-notes.md](https://github.com/CCYellowStar2/dsh-astrbot-ingress/blob/main/docs/design-notes.md)。
 
 ## 技能
 
