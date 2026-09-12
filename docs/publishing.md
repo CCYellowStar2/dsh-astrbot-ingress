@@ -38,7 +38,22 @@ AstrBot 插件另有一个**镜像仓库**，用 `scripts/sync-plugin-mirror.mjs
    （克隆目录只当临时工作区；本机是 Windows，别用 `/tmp`。同步脚本会把 6 个文件拷过去，
    里面除 `metadata.yaml` 外的文件常因换行符被判「已修改」，`git diff --stat` 只认真实内容变化。）
 
-5. 发 npm（**可选**，前提是注册了 npm 账号并 `npm login`）：
+5. **打 Release + 刷 tarball（别漏！）**：DSH 市场条目引用的是**固定文件名**的预构建包
+   （`releases/latest/download/dsh-astrbot-ingress.tgz`），所以每次发版都要把同名资产覆盖上传，
+   否则市场用户拿到的还是旧版本（2026-09-12 踩过：仓库到 0.3.2 了，tarball 还停在 0.2.0）。
+
+   ```bash
+   npm pack && mv dsh-astrbot-ingress-<版本>.tgz dsh-astrbot-ingress.tgz
+   gh release create v<版本> --title "v<版本> — <一句话>" --notes-file <notes.md> --target main
+   # 取 release id，再走 REST 上传（gh release upload 常因 GraphQL TLS 超时失败）
+   gh api --method POST -H "Content-Type: application/octet-stream" --input dsh-astrbot-ingress.tgz \
+     "https://uploads.github.com/repos/CCYellowStar2/dsh-astrbot-ingress/releases/<release-id>/assets?name=dsh-astrbot-ingress.tgz"
+   ```
+
+   核对（不能只看大小）：下载固定链接、解包看 `package.json` 的 `version` 与本版新增的符号是否在
+   `lib/index.js` 里。`*.tgz` 已在 `.gitignore` 里，不会误提交。
+
+6. 发 npm（**可选**，前提是注册了 npm 账号并 `npm login`）：
 
    ```bash
    npm publish --access public
