@@ -117,11 +117,17 @@ AstrBot 用 GitHub 托管插件：市场按 `metadata.yaml` 的 `name` / `repo` 
   「安装 GitHub App / 认领仓库」，这一步没走完提交不成立。没有 GitHub App 时还能走 **zip 上传**。
 - 提交进的是 Cloud 的库，只有登录后能看：**<https://cloud.astrbot.app/profile>**（我的提交与状态）、
   `/reviews` 是审核台。账号限额：同时最多 5 条在审、24 小时最多 10 次提交。
+- **提交后卡在「等待安全检查」是正常的，别重复提交**：那是 Cloud 审核流水线的一站，不是让你过的验证码
+  （验证码只出现在登录/提交那一步，是 Turnstile 或 hCaptcha，本机网络可达）。
+  审核台的实现（`_app/reviews-*.js`）是：提交 → LLM 初审（`/admin/reviews/plugins/<slug>/rerun-llm`、
+  `confirm-llm`）→ **安全检查队列**（自动扫代码，产出 `guard_summary` / `guard_findings`，可重跑）
+  → `review-worker` 队列 → 审核员通过/拒绝。审核台里还有个「安全检查前人工确认」开关，
+  打开时得等审核员点一下版本确认才进队列。用户侧无事可做，等就行。
 - **审核通过后**才由 `astrbot-plugin-copybara[bot]` 往 GitHub 的
   [AstrBot_Plugins_Collection](https://github.com/AstrBotDevs/AstrBot_Plugins_Collection)
   同步（仓库里那些 `Sync plugin: xxx` 的自动提交就是它），并出现在市场
   <https://cloud.astrbot.app/market>（2088 个插件）。所以「提交后没动静」是正常的。
-- 想查某插件在不在市场（公开接口，无需登录）：
+- 已上架与否可以自查（公开接口，无需登录）：
 
   ```bash
   curl -s 'https://cloud.astrbot.app/api/v1/market/plugins?page=1&page_size=20&search=dsh' | jq '.data.total'
