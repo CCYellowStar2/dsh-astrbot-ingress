@@ -74,6 +74,7 @@ Token 写在 `%DSH_HOME%/dsh-astrbot-ingress/config.json`（Linux/macOS 通常�
 | `beacon` | 开 | 把实际端口与 token 写进 `%DSH_HOME%/astrbot-ingress.json`（0600），供同机 AstrBot 自动发现；不想写就设 `false` |
 | `inboundUrlMaxMb` | 200 | URL 入站的单文件上限（AstrBot 侧 `inbound_url_max_mb` 也要够） |
 | `inboundUrlTimeoutMs` | 60000 | 单个 URL 的下载超时 |
+| `outboundUrlMaxMb` | 200 | 出站文件「拉取凭证」的单文件上限（AstrBot 侧 `outbound_pull_max_mb` 也要够） |
 | `endGraceMs` | 1200 | 每条助手消息的**最后一段**只压这么久等 `turn/end` 来拼 `—— 本回合结束`；等不到就先发正文。**别设太大**（设成几千毫秒就会重新出现「正文慢一拍」的手感） |
 
 过程档位通常由 AstrBot 侧的 `progress_mode` 逐次带过来，这里的值只是「请求没带」时的兜底：
@@ -100,6 +101,8 @@ Token 写在 `%DSH_HOME%/dsh-astrbot-ingress/config.json`（Linux/macOS 通常�
 | `inbound_dsh_prefix` | 留空 | 仅分容器时填：同一目录在 DSH 侧的写法，如 `D:\proj\.dsh-inbox`（同机两边是同一个路径） |
 | `inbound_url_base` | 留空 = 关 | **URL 入站**：DSH 能访问到的 AstrBot 基址（宿主视角），如 `http://127.0.0.1:10000`。填了它大附件就不用挂共享盘 |
 | `inbound_url_candidates` | 空 | URL 入站的候选（裸端口或完整地址）。留空时只用本机 dashboard 端口 |
+| `ingress_url_candidates` | 空 | ingress 地址的额外候选；留空时内置 `host.docker.internal:3188` / `127.0.0.1:3188`，自动探测 |
+| `outbound_pull` | 开 | 出站文件本地看不到时从 ingress 拉（Docker 下免挂盘） |
 | `inbound_url_mode` | `auto` | `auto`=只有 >12MB 走 URL；`always`=全走；`off`=关 |
 
 **推荐零配置方案**：在 AstrBot 主配置里填 `callback_api_base`（如 `http://astrbot:6185`），出站文件 / 图片 / 视频会注册成 URL 交给协议端下载 —— **不需要共享盘**，也不用管两边挂载点是否同名。没填时，「AstrBot 与协议端分容器」就必须挂共享目录并填 `send_protocol_path`。

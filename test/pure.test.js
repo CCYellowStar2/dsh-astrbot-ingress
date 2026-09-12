@@ -7,6 +7,8 @@ import { join } from 'node:path'
 
 import {
   beaconPayload,
+  createFileToken,
+  takeFileToken,
   extractSendFiles,
   firstThinkingLine,
   formatElapsed,
@@ -271,4 +273,24 @@ test('extractSendFiles: 抽出指令、剥离该行、忽略不存在与 URL', (
   assert.deepEqual(url.files, [])
 
   assert.deepEqual(extractSendFiles('', root), { cleanText: '', files: [] })
+})
+
+test('createFileToken / takeFileToken: 一次性、TTL 到点作废', () => {
+  const store = new Map()
+  const now = 1_700_000_000_000
+  const token = createFileToken(store, { path: '/w/a.bin', name: 'a.bin', size: 42 }, now)
+  assert.equal(typeof token, 'string')
+  assert.equal(token.length, 32)
+  assert.equal(store.size, 1)
+
+  const hit = takeFileToken(store, token, now + 1000)
+  assert.equal(hit.path, '/w/a.bin')
+  assert.equal(hit.size, 42)
+  assert.equal(store.size, 0, '取过就作废')
+  assert.equal(takeFileToken(store, token, now + 1000), null, '不能再取第二次')
+
+  const t2 = createFileToken(store, { path: '/w/b.bin', size: 1 }, now, 1000)
+  assert.equal(takeFileToken(store, t2, now + 1001), null, '过期取不到')
+  assert.equal(takeFileToken(store, 'nope', now), null)
+  assert.equal(takeFileToken(store, '', now), null)
 })

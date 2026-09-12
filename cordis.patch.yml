@@ -26,3 +26,5 @@
         # AstrBot 插件配置里的 inbound_url_max_mb / 下载超时不够时才会用到这两个。
         inboundUrlMaxMb: 200
         inboundUrlTimeoutMs: 60000
+        # 出站文件「拉取凭证」（AstrBot 看不见文件时自己来取）的单文件上限：
+        outboundUrlMaxMb: 200

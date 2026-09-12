@@ -177,6 +177,24 @@ Docker 部署不想挂共享盘时走这条：插件把附件登记成 AstrBot �
   自己的 HTTP 服务，就必须异步。**
 - 出站不受影响（出站仍走共享目录或 AstrBot 的回调 URL）。
 
+## 出站文件的「拉取兜底」（0.3.6）
+
+出站文件过去要求**AstrBot 能直接读到那个文件**（`D:\x` → `/mnt/d/x` 的挂载约定）—— Docker 下
+官方 compose 只挂 `./data`，DSH 产出的文件它根本看不见。现在多了一条兜底：
+
+1. 先照旧试本地路径（挂了盘的用户零开销）；
+2. 看不到 → `POST /file-token`（Bearer）带上 `{path, umo}`，由 ingress **按该会话的工作区**校验
+   （工作区外、敏感路径一律拒绝，凭证 120 秒过期、只用一次）并返回一次性 token；
+3. 插件 `GET {ingress_url}/file/<token>` 流式拉到自己的 `data/temp/` → 按原逻辑发出 → 用完删掉。
+
+于是 Docker 官方 compose 下**出站文件也不用挂盘**了；协议端那一腿仍按原规则（OneBot 的
+`File` 段会变成 `file:///绝对路径`，NapCat 官方 compose 里两边共用 `./data:/AstrBot/data`，
+所以 AstrBot 的 `data/temp` 正好也是 NapCat 能读到的路径 ✅）。
+
+**ingress 地址也做成候选**：`ingress_url` 留空时依次用 信标 → `host.docker.internal:3188` →
+`127.0.0.1:3188` → `ingress_url_candidates`，用 `/health`（不需要 token）探一遍取第一个通的，
+结果缓存 300 秒。Docker 下于是只剩 `token` 一个必填字段。
+
 ## 未来改进（尚未实现）
 
 - **出站也走 URL**：现在出站文件依赖共享目录 / 回调 URL；若把「AstrBot 主动来取」反过来做成
