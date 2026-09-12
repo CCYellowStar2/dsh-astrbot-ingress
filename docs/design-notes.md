@@ -58,9 +58,12 @@ AstrBot 侧要填地址 + token —— 这部分用**信标**抹掉：
 
 排查用的小工具：
 
-- **信标里的 `version` 就是重载指示器**：改完 ingress 代码后，`~/.dsh/astrbot-ingress.json` 的 `version`
-  变了才说明 DSH 侧真的重载了（在 AstrBot 里点重载不算——ingress 是 DSH 宿主插件，得在 DSH 的设置 → 插件里
-  重载，或重启 `dsh web`）。
+- **别拿信标里的 `version` 当重载指示器**（2026-09-12 踩过并纠正）：信标每 30 秒刷新时是从**磁盘上的
+  `package.json`** 现读版本的，所以**旧代码也会报出新版本号**——它只能证明「进程活着」。
+  可靠判据只有两个：① 进程 **pid 变了**（重启 `dsh web`）；② 新代码独有的接口/字段在响应里出现了
+  （例：`GET /probe-url` 返回 `{"ok":false,"error":"not found"}` 就说明跑的还是旧代码）。
+  在 AstrBot 里点重载**不算** DSH 侧重载 —— ingress 是 DSH 宿主插件，得在 DSH 的设置 → 插件里重载，
+  或重启 `dsh web`。
 - `~/.dsh/dsh-astrbot-ingress/trace.log`：`adopt-turn` / `supersede` / `drop-stale` / `flush-held` /
   `grace-flush` / `turn-end` 每次一行，超过 1MB 自动归档成 `.old`（`traceLog: false` 可关）。
 - AstrBot 侧对应 `trace_delivery`（`[dsh-trace]` 前缀）：SSE 事件到达时刻 + 每条正文的发送时刻 + passive/active。
