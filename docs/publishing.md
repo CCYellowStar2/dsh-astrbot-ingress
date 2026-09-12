@@ -52,6 +52,44 @@ AstrBot 插件另有一个**镜像仓库**，用 `scripts/sync-plugin-mirror.mjs
   `metadata.yaml` / `README.md`）。
 - 发布前确认占位符都已替换：搜 `<AUTHOR>` / `<GITHUB_USER>` / `<INGRESS_REPO>` / `<PLUGIN_REPO>`。
 
+## DSH 插件市场（awesome-dsh-plugin）
+
+条目已备好：`docs/marketplace-entry.yml`（分类 `remote`，另带 `tarball:` 指向 Release 里的预构建包）。
+投稿规则见仓库的 `contributing.md`，要点：
+
+- 只投**一个文件**：`data/plugins/CCYellowStar2__dsh-astrbot-ingress.yml`，内容就是本仓库
+  `docs/marketplace-entry.yml`。README 由脚本生成，**不要手工改**。
+- 仓库要声明 `dsh.bundle`（本仓库已有 ✅）、根目录有 `cordis.patch.yml` ✅、
+  挂 `dsh-plugin` topic ✅。
+- **仓库需创建满 1 天**（CI 自动查）。本仓库建于 2026-09-12T07:03Z，
+  因此 **2026-09-13T07:03Z（北京时间 15:03）之后**才能提 PR，提前提会被 CI 判失败。
+- 描述必须与代码一致（会人工核对），所以每次加删功能要回来改这里。
+
+提交（示例）：
+
+```bash
+gh repo fork awesome-dsh-plugin/awesome-dsh-plugin --clone
+cd awesome-dsh-plugin
+git checkout -b add-ccyellowstar2-dsh-astrbot-ingress
+cp ../dsh-astrbot-ingress/docs/marketplace-entry.yml data/plugins/CCYellowStar2__dsh-astrbot-ingress.yml
+git add -A && git commit -m "Add CCYellowStar2/dsh-astrbot-ingress"
+git push -u origin HEAD
+gh pr create --fill
+```
+
+### 预构建 tarball
+
+Release 里挂了 `dsh-astrbot-ingress.tgz`（`npm pack` 产物）。市场条目用
+`releases/latest/download/` 指向它，所以**每次发版都要用同一个文件名覆盖上传**，否则链接会跳到旧版本：
+
+```bash
+npm pack && mv dsh-astrbot-ingress-<版本>.tgz dsh-astrbot-ingress.tgz
+gh api --method POST -H "Content-Type: application/octet-stream" --input dsh-astrbot-ingress.tgz \
+  "https://uploads.github.com/repos/CCYellowStar2/dsh-astrbot-ingress/releases/<release-id>/assets?name=dsh-astrbot-ingress.tgz"
+```
+
+（`gh release upload` 在本机常因 GraphQL 端点 TLS 超时失败，用上面的 REST 上传更稳。）
+
 ## AstrBot 插件市场（可选）
 
 AstrBot 通过 `metadata.yaml` 的 `repo` / `name` 识别插件。想让别人一键装，把镜像仓库地址
