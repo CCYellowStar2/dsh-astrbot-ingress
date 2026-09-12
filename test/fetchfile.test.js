@@ -6,7 +6,7 @@ import { existsSync, mkdtempSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { downloadUrlToFile, isHttpUrl } from '../lib/fetchfile.js'
+import { downloadUrlToFile, isHttpUrl, probeUrl } from '../lib/fetchfile.js'
 
 function serve(routes) {
   const server = createServer((req, res) => {
@@ -82,6 +82,46 @@ test('downloadUrlToFile: 正常下载、超限、404、超时、非 http 都要�
       () => downloadUrlToFile(`${base}/ok.bin`, join(dir, 'z.bin'), { fetchImpl: null }),
       /fetch/,
     )
+  } finally {
+    server.close()
+  }
+})
+
+test('probeUrl: 可达 / 404 / 超时 / 非 http 都要判对', async () => {
+  const { server, port } = await serve({
+    '/ok.bin': (req, res) => {
+      res.writeHead(200, { 'content-type': 'application/octet-stream' })
+      res.end(Buffer.alloc(2048, 3))
+    },
+    '/slow.bin': (req, res) => {
+      setTimeout(() => {
+        try { res.end('late') } catch { /* 已断开 */ }
+      }, 800)
+    },
+  })
+  const base = `http://127.0.0.1:${port}`
+  try {
+    const ok = await probeUrl(`${base}/ok.bin`)
+    assert.equal(ok.ok, true)
+    assert.equal(ok.status, 200)
+    assert.equal(ok.contentType, 'application/octet-stream')
+    assert.ok(ok.bytes > 0, '应当读到一小段数据')
+
+    const missing = await probeUrl(`${base}/nope.bin`)
+    assert.equal(missing.ok, false)
+    assert.equal(missing.status, 404)
+
+    const slow = await probeUrl(`${base}/slow.bin`, { timeoutMs: 150 })
+    assert.equal(slow.ok, false)
+    assert.match(slow.error, /超时|abort/i)
+
+    const bad = await probeUrl('file:///etc/hosts')
+    assert.equal(bad.ok, false)
+    assert.match(bad.error, /http/)
+
+    const noFetch = await probeUrl(`${base}/ok.bin`, { fetchImpl: null })
+    assert.equal(noFetch.ok, false)
+    assert.match(noFetch.error, /fetch/)
   } finally {
     server.close()
   }

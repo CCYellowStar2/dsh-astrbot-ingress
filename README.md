@@ -99,6 +99,7 @@ Token 写在 `%DSH_HOME%/dsh-astrbot-ingress/config.json`（Linux/macOS 通常�
 | `inbound_share_dir` | 留空 | 入站大文件（>12MB）暂存目录（AstrBot 侧）。**同机留空即可** —— 自动用 DSH 当前工作区下的 `.dsh-inbox`；分容器才填，如 `/mnt/d/proj/.dsh-inbox` |
 | `inbound_dsh_prefix` | 留空 | 仅分容器时填：同一目录在 DSH 侧的写法，如 `D:\proj\.dsh-inbox`（同机两边是同一个路径） |
 | `inbound_url_base` | 留空 = 关 | **URL 入站**：DSH 能访问到的 AstrBot 基址（宿主视角），如 `http://127.0.0.1:10000`。填了它大附件就不用挂共享盘 |
+| `inbound_url_candidates` | 空 | URL 入站的候选（裸端口或完整地址）。留空时只用本机 dashboard 端口 |
 | `inbound_url_mode` | `auto` | `auto`=只有 >12MB 走 URL；`always`=全走；`off`=关 |
 
 **推荐零配置方案**：在 AstrBot 主配置里填 `callback_api_base`（如 `http://astrbot:6185`），出站文件 / 图片 / 视频会注册成 URL 交给协议端下载 —— **不需要共享盘**，也不用管两边挂载点是否同名。没填时，「AstrBot 与协议端分容器」就必须挂共享目录并填 `send_protocol_path`。
