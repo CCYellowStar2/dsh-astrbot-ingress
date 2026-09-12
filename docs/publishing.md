@@ -1,69 +1,56 @@
-# 发布步骤（两个仓库 + npm）
+# 发布记录与流程
 
 本仓库是**唯一源码**：DSH 侧插件在根目录，AstrBot 插件在 `astrbot_plugin_dsh/`。
-AstrBot 插件另有一个**镜像仓库**（内容一样），用脚本同步过去。
+AstrBot 插件另有一个**镜像仓库**，用 `scripts/sync-plugin-mirror.mjs` 同步。
 
-先按实际情况替换这些占位符：
+## 已发布（0.2.0）
 
-| 占位符 | 用在哪儿 |
+| 产物 | 地址 |
 |---|---|
-| `<AUTHOR>` | `LICENSE`、`package.json` 的 `author`、`metadata.yaml` 的 `author` |
-| `<GITHUB_USER>` | 两个仓库的归属（用户名或组织） |
-| `<INGRESS_REPO>` | 本仓库名，默认 `dsh-astrbot-ingress` |
-| `<PLUGIN_REPO>` | 插件镜像仓库名，默认 `astrbot_plugin_dsh` |
+| DSH 侧插件（源码仓库） | https://github.com/CCYellowStar2/dsh-astrbot-ingress |
+| AstrBot 插件（镜像仓库） | https://github.com/CCYellowStar2/astrbot_plugin_dsh |
+| npm 包 | `dsh-astrbot-ingress`（`npm publish` 由仓库属主执行） |
 
-## 一次性的元数据
+元数据已填：`LICENSE` 版权行 / `package.json` 的 `author`·`repository`·`homepage`·`bugs` /
+`astrbot_plugin_dsh/metadata.yaml` 的 `author`·`repo`。README 之间用绝对 URL 互相链接
+（npm 页面不解析相对路径）。
 
-1. `package.json` 补上：
+## 发新版本
 
-   ```json
-   "author": "<AUTHOR>",
-   "repository": { "type": "git", "url": "git+https://github.com/<GITHUB_USER>/<INGRESS_REPO>.git" },
-   "homepage": "https://github.com/<GITHUB_USER>/<INGRESS_REPO>#readme",
-   "bugs": { "url": "https://github.com/<GITHUB_USER>/<INGRESS_REPO>/issues" }
+1. **三处版本一起改**：`package.json` 的 `version`、`astrbot_plugin_dsh/metadata.yaml` 的
+   `version`（形如 `v0.2.1`）、`CHANGELOG.md` 新增版本小节。
+2. 跑测试：`npm test`（纯函数单测）与 `npm pack --dry-run`（确认 tarball 内容）。
+3. 推源码仓库：
+
+   ```bash
+   git add -A && git commit -m "1.2.3: ..." && git push
    ```
 
-2. `astrbot_plugin_dsh/metadata.yaml` 把 `author` 改成 `<AUTHOR>`、`repo` 填插件仓库地址
-   `https://github.com/<GITHUB_USER>/<PLUGIN_REPO>`（AstrBot 插件市场靠这个字段找仓库）。
+4. 同步镜像仓库：
 
-3. README 互相链接改成**绝对 URL**（npm 页面不解析相对路径）：
-   - 根 README 里指向 `astrbot_plugin_dsh/README.md` 的链接 → 插件仓库地址
-   - 插件 README 里指向 `../README.md` 的链接 → 本仓库地址
+   ```bash
+   gh repo clone CCYellowStar2/astrbot_plugin_dsh /tmp/astrbot_plugin_dsh
+   node scripts/sync-plugin-mirror.mjs /tmp/astrbot_plugin_dsh
+   cd /tmp/astrbot_plugin_dsh && git add -A && git commit -m "v1.2.3" && git push
+   ```
 
-## 发布 DSH 侧插件（npm）
+5. 发 npm：
 
-```bash
-npm test                     # 13 个纯函数单测
-npm pack --dry-run           # 看清 tarball 里有什么（lib/ skills/ astrbot_plugin_dsh/ docs/ test/）
-npm publish --access public  # 需要先 npm login；包名 dsh-astrbot-ingress 目前未被占用
-```
+   ```bash
+   npm login            # 首次
+   npm publish --access public
+   ```
 
-发完在 npm 页面确认 README 渲染正常（尤其表格与代码块）。
+## 纪律
 
-## 发布两个 GitHub 仓库
-
-```bash
-# 仓库 A：DSH 侧插件（当前目录）
-git init && git add -A && git commit -m "dsh-astrbot-ingress 0.2.0"
-git branch -M main
-git remote add origin https://github.com/<GITHUB_USER>/<INGRESS_REPO>.git
-git push -u origin main
-
-# 仓库 B：AstrBot 插件镜像
-cd /path/to/empty/<PLUGIN_REPO>        # 先建空仓库并 clone
-node /path/to/dsh-astrbot-ingress/scripts/sync-plugin-mirror.mjs .
-git add -A && git commit -m "astrbot_plugin_dsh 0.2.0（镜像自 <INGRESS_REPO>）"
-git push -u origin main
-```
-
-改完插件代码后：**先改本仓库的 `astrbot_plugin_dsh/`，再跑一次同步脚本**，两个仓库就不会漂。
-
-## 版本一致性
-
-三处必须同时改：`package.json` 的 `version`、`astrbot_plugin_dsh/metadata.yaml` 的 `version`
-（形如 `v0.2.0`）、以及 `CHANGELOG.md` 的版本小节。
+- **改插件代码只改本仓库的 `astrbot_plugin_dsh/`**，然后跑同步脚本；不要直接在镜像仓库里改，
+  否则两边会漂。
+- AstrBot 实际加载的那份（`<AstrBot>/data/plugins/astrbot_plugin_dsh/`）也是**产物**：
+  改完本仓库要把它一起覆盖过去，并核对四份文件一致（`main.py` / `_conf_schema.json` /
+  `metadata.yaml` / `README.md`）。
+- 发布前确认占位符都已替换：搜 `<AUTHOR>` / `<GITHUB_USER>` / `<INGRESS_REPO>` / `<PLUGIN_REPO>`。
 
 ## AstrBot 插件市场（可选）
 
-AstrBot 通过 `metadata.yaml` 的 `repo`/`name` 识别插件。想让别人一键装，把插件仓库地址
-提交到 AstrBot 的插件索引（或直接分享仓库链接，用户也可以把整个目录拷进 `data/plugins/`）。
+AstrBot 通过 `metadata.yaml` 的 `repo` / `name` 识别插件。想让别人一键装，把镜像仓库地址
+提交到 AstrBot 的插件索引；用户也可以直接把整个目录拷进 `data/plugins/`。
