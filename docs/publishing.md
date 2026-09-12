@@ -111,10 +111,14 @@ AstrBot 用 GitHub 托管插件：市场按 `metadata.yaml` 的 `name` / `repo` 
 镜像仓库同时也能当「手动安装」入口：把整个目录拷进 `data/plugins/` 即可，
 AstrBot 的插件管理页也支持直接填仓库地址安装。
 
-### 发布页的等价人工路线（本仓库实际走的那条）
+### 备选：人工 PR（**没走这条**，留作应急）
 
-发布页本质就是往 [AstrBotDevs/AstrBot_Plugins_Collection](https://github.com/AstrBotDevs/AstrBot_Plugins_Collection)
-的 `plugins.json` 追加一条（最新的几条 PR 都是这个形状），所以不用 Cloud 账号也能发：
+发布页的事本质就是往 [AstrBotDevs/AstrBot_Plugins_Collection](https://github.com/AstrBotDevs/AstrBot_Plugins_Collection)
+的 `plugins.json` 追加一条，所以没有 Cloud 账号也能发 PR（2026-09-12 试过一条：PR #2114，
+Sourcery 通过、`Validate Plugin Smoke` 停在 `action_required`），但**既然要发就按官方流程发**，
+那条 PR 已关闭——同一条目两个 PR 都合并会让 `plugins.json` 出重复键。
+
+真要走这条时的步骤与坑：
 
 1. `gh repo fork AstrBotDevs/AstrBot_Plugins_Collection --clone=false`
 2. 克隆自己的 fork，在 `plugins.json` **末尾**追加 `astrbot_plugin_dsh` 一条
