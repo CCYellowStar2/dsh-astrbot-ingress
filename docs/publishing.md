@@ -99,7 +99,7 @@ gh api --method POST -H "Content-Type: application/octet-stream" --input dsh-ast
 AstrBot 用 GitHub 托管插件：市场按 `metadata.yaml` 的 `name` / `repo` 识别并拉取镜像仓库，
 **不需要提 PR**，走网页发布页。
 
-1. 注册 [AstrBot Cloud](https://cloud.astrbot.app) 账号（发布页要求登录）。
+1. 注册 [AstrBot Cloud](https://cloud.astrbot.app) 账号（发布页要求登录，可用 GitHub 登录）。
 2. 打开 <https://cloud.astrbot.app/publish>，填插件仓库地址
    `https://github.com/CCYellowStar2/astrbot_plugin_dsh`，提交审核。
 3. 审核要点（[官方文档](https://docs.astrbot.app/dev/star/plugin-publish.html)）：
@@ -107,6 +107,27 @@ AstrBot 用 GitHub 托管插件：市场按 `metadata.yaml` 的 `name` / `repo` 
      镜像仓库已有 `.gitignore` ✅）；
    - `metadata.yaml` 必填 `name` / `desc` / `version` / `author`，`version` 用语义化版本；
    - 可选 `short_desc`（紧凑 UI 一句话）/ `social_link` / `tags`（市场分类与搜索）——都已填 ✅。
+
+#### 这条流水线长什么样（**别指望它开 PR**）
+
+2026-09-12 实测：Cloud 是**自己一套审核库**，不是把提交转成 GitHub PR。
+
+- 发布页前端要 **授权它读你的仓库**：`POST /market/plugins/parse/github`（带 `github_installation_id` +
+  `github_repository_id`）解析 `metadata.yaml`；页面上 `claim_status` 不是 `claimed` 时会让你
+  「安装 GitHub App / 认领仓库」，这一步没走完提交不成立。没有 GitHub App 时还能走 **zip 上传**。
+- 提交进的是 Cloud 的库，只有登录后能看：**<https://cloud.astrbot.app/profile>**（我的提交与状态）、
+  `/reviews` 是审核台。账号限额：同时最多 5 条在审、24 小时最多 10 次提交。
+- **审核通过后**才由 `astrbot-plugin-copybara[bot]` 往 GitHub 的
+  [AstrBot_Plugins_Collection](https://github.com/AstrBotDevs/AstrBot_Plugins_Collection)
+  同步（仓库里那些 `Sync plugin: xxx` 的自动提交就是它），并出现在市场
+  <https://cloud.astrbot.app/market>（2088 个插件）。所以「提交后没动静」是正常的。
+- 想查某插件在不在市场（公开接口，无需登录）：
+
+  ```bash
+  curl -s 'https://cloud.astrbot.app/api/v1/market/plugins?page=1&page_size=20&search=dsh' | jq '.data.total'
+  ```
+
+  （搜索参数是 `search`，不是 `query`/`q`；按名字单查的 `/market/plugins/<name>` 会 404，它认内部 ID。）
 
 镜像仓库同时也能当「手动安装」入口：把整个目录拷进 `data/plugins/` 即可，
 AstrBot 的插件管理页也支持直接填仓库地址安装。
