@@ -17,7 +17,12 @@ QQ / NapCat ──OneBot──▶ AstrBot ──HTTP──▶ 本插件 :3188 �
 ### 1. DSH 侧插件
 
 ```bash
-dsh plugin --profile web add <本目录>
+# 从 GitHub 直接装（plugin add 转发给 pnpm，支持 github: / git+https: / 本地路径）
+dsh plugin --profile web add github:CCYellowStar2/dsh-astrbot-ingress
+
+# 或先 clone，再装本地目录
+git clone https://github.com/CCYellowStar2/dsh-astrbot-ingress
+dsh plugin --profile web add ./dsh-astrbot-ingress
 ```
 
 重启 `dsh web`，控制台应出现：
@@ -30,7 +35,8 @@ Token 写在 `%DSH_HOME%/dsh-astrbot-ingress/config.json`（Linux/macOS 通常�
 
 ### 2. AstrBot 侧插件
 
-把 `astrbot_plugin_dsh/` 拷进 AstrBot 的 `data/plugins/`，在 WebUI 里重载插件，填上 token 与 ingress 地址（见下）。插件自身的说明见 [`astrbot_plugin_dsh`](https://github.com/CCYellowStar2/astrbot_plugin_dsh)。
+把 `astrbot_plugin_dsh/` 拷进 AstrBot 的 `data/plugins/`（或在 AstrBot WebUI 的插件页用仓库地址
+`https://github.com/CCYellowStar2/astrbot_plugin_dsh` 安装），再重载插件、填上 token 与 ingress 地址（见下）。插件自身的说明见 [`astrbot_plugin_dsh`](https://github.com/CCYellowStar2/astrbot_plugin_dsh)。
 
 ## 配置
 

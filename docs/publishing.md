@@ -9,7 +9,7 @@ AstrBot 插件另有一个**镜像仓库**，用 `scripts/sync-plugin-mirror.mjs
 |---|---|
 | DSH 侧插件（源码仓库） | https://github.com/CCYellowStar2/dsh-astrbot-ingress |
 | AstrBot 插件（镜像仓库） | https://github.com/CCYellowStar2/astrbot_plugin_dsh |
-| npm 包 | `dsh-astrbot-ingress`（`npm publish` 由仓库属主执行） |
+| npm 包 | `dsh-astrbot-ingress` —— **尚未发布**（npm 账号未注册）。**非必须**：DSH 的 `dsh plugin --profile web add github:CCYellowStar2/dsh-astrbot-ingress` 直接走 pnpm 的 git 安装即可 |
 
 元数据已填：`LICENSE` 版权行 / `package.json` 的 `author`·`repository`·`homepage`·`bugs` /
 `astrbot_plugin_dsh/metadata.yaml` 的 `author`·`repo`。README 之间用绝对 URL 互相链接
@@ -34,12 +34,14 @@ AstrBot 插件另有一个**镜像仓库**，用 `scripts/sync-plugin-mirror.mjs
    cd /tmp/astrbot_plugin_dsh && git add -A && git commit -m "v1.2.3" && git push
    ```
 
-5. 发 npm：
+5. 发 npm（**可选**，前提是注册了 npm 账号并 `npm login`）：
 
    ```bash
-   npm login            # 首次
    npm publish --access public
    ```
+
+   没发 npm 也能正常用：`dsh plugin --profile web add github:CCYellowStar2/dsh-astrbot-ingress`
+   会由 pnpm 直接从 git 装。npm 的好处只是版本号可查、`npx` 一行装、以及出现在 npm 搜索里。
 
 ## 纪律
 
