@@ -72,6 +72,8 @@ Token 写在 `%DSH_HOME%/dsh-astrbot-ingress/config.json`（Linux/macOS 通常�
 | `showToolCalls` | 开 | `full` 档是否发工具行；`digest` 档是否把工具次数写进汇报 |
 | `toolLineBatch` | 5 | `full` 档连续工具行并成一条（1 = 每条单发） |
 | `beacon` | 开 | 把实际端口与 token 写进 `%DSH_HOME%/astrbot-ingress.json`（0600），供同机 AstrBot 自动发现；不想写就设 `false` |
+| `inboundUrlMaxMb` | 200 | URL 入站的单文件上限（AstrBot 侧 `inbound_url_max_mb` 也要够） |
+| `inboundUrlTimeoutMs` | 60000 | 单个 URL 的下载超时 |
 | `endGraceMs` | 1200 | 每条助手消息的**最后一段**只压这么久等 `turn/end` 来拼 `—— 本回合结束`；等不到就先发正文。**别设太大**（设成几千毫秒就会重新出现「正文慢一拍」的手感） |
 
 过程档位通常由 AstrBot 侧的 `progress_mode` 逐次带过来，这里的值只是「请求没带」时的兜底：
@@ -96,6 +98,8 @@ Token 写在 `%DSH_HOME%/dsh-astrbot-ingress/config.json`（Linux/macOS 通常�
 | `send_outbox_dir` | 留空 | 仅当两边**挂载点不同名**时填（AstrBot 侧那个名字） |
 | `inbound_share_dir` | 留空 | 入站大文件（>12MB）暂存目录（AstrBot 侧）。**同机留空即可** —— 自动用 DSH 当前工作区下的 `.dsh-inbox`；分容器才填，如 `/mnt/d/proj/.dsh-inbox` |
 | `inbound_dsh_prefix` | 留空 | 仅分容器时填：同一目录在 DSH 侧的写法，如 `D:\proj\.dsh-inbox`（同机两边是同一个路径） |
+| `inbound_url_base` | 留空 = 关 | **URL 入站**：DSH 能访问到的 AstrBot 基址（宿主视角），如 `http://127.0.0.1:10000`。填了它大附件就不用挂共享盘 |
+| `inbound_url_mode` | `auto` | `auto`=只有 >12MB 走 URL；`always`=全走；`off`=关 |
 
 **推荐零配置方案**：在 AstrBot 主配置里填 `callback_api_base`（如 `http://astrbot:6185`），出站文件 / 图片 / 视频会注册成 URL 交给协议端下载 —— **不需要共享盘**，也不用管两边挂载点是否同名。没填时，「AstrBot 与协议端分容器」就必须挂共享目录并填 `send_protocol_path`。
 

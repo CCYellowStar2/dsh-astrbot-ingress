@@ -22,3 +22,7 @@
         # 等不到就先把正文发出去。从前是压到「下一段正文/回合结束」才发 —— 中间隔着长
         # 工具阶段时正文会被压几分钟（「正文慢一拍」的根因）。
         endGraceMs: 1200
+        # URL 入站（AstrBot 侧登记一次性 URL，我们自己去下载）的兜底参数：
+        # AstrBot 插件配置里的 inbound_url_max_mb / 下载超时不够时才会用到这两个。
+        inboundUrlMaxMb: 200
+        inboundUrlTimeoutMs: 60000

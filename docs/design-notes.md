@@ -139,16 +139,34 @@ AstrBot 侧要填地址 + token —— 这部分用**信标**抹掉：
   超时 / 取消时工具带一句说明失败，模型自己接着往下走。
 - 只有**发起那一轮的人**能在 QQ 里回答（和审批一致）。
 
+## URL 入站（0.3.3 已实现）
+
+Docker 部署不想挂共享盘时走这条：插件把附件登记成 AstrBot 的**一次性 URL**，ingress 自己去下载。
+
+- 插件侧：`inbound_url_base`（**DSH 视角**的 AstrBot 基址，如 `http://127.0.0.1:10000` —— 宿主机端口，
+  不是容器里的 6185）→ 用 `from astrbot.core import file_token_service` 拿单例，
+  `register_file(local_path)` 得到 token，拼 `{base}/api/file/{token}`。
+  ⚠️ **不能用 `callback_api_base`**：那是给协议端看的（Docker 里常是 `http://astrbot:6185`），
+  宿主机上的 DSH 解析不了。也不能 `from astrbot.core.file_token_service import file_token_service`
+  —— 单例挂在**包**上（`astrbot/core/__init__.py: file_token_service = FileTokenService()`），
+  模块里只有 `FileTokenService` 类。
+- 模式：`inbound_url_mode` = `auto`（默认，只有 >12MB 才走 URL）/ `always`（全走，彻底不要共享目录）/
+  `off`。上限 `inbound_url_max_mb`（默认 200），DSH 侧还有 `inboundUrlMaxMb` 兜底。
+- 为什么能匿名取：`/api/file` 在 AstrBot dashboard 的 `allowed_endpoint_prefixes` 里（token 即凭证，
+  默认 5 分钟有效、单次）。宿主机 `GET /api/file/<假token>` 返回 404 而不是 401 就能确认路由可达。
+- ingress 侧：`files[].url` → `downloadUrlToFile()`（`lib/fetchfile.js`，有单测）：流式写进
+  `cwd/.dsh-inbox/`，边下边计数（超限立即中断并删半截文件）、`AbortController` 超时、失败清干净。
+- 回退链：URL 失败 / 未配 base / 超过上限 → 共享目录 → base64 → 最后才是「太大」提示。
+  大文件在 `auto` 模式下**优先**走 URL，所以「Docker 不挂盘 + 大附件」这条组合终于成立。
+- 出站不受影响（出站仍走共享目录或 AstrBot 的回调 URL）。
+
 ## 未来改进（尚未实现）
 
-- **URL 入站**：让 Docker 部署也能「两边都不挂共享盘」。做法是 ingress 的 `files[]` 支持 `url`
-  （流式下载进 `cwd/.dsh-inbox/`），插件侧用 AstrBot 的
-  `BaseMessageComponent.register_to_file_service()`（`callback_api_base` + `/api/file/{token}`）
-  把本地附件变成 URL。
-  - ⚠️ 需要一个**独立于 `callback_api_base` 的 DSH 视角基址**（如 `inbound_url_base`）：
-    `callback_api_base` 是给协议端看的（Docker 里常是 `http://astrbot:6185`），宿主机上的 DSH 解析不了。
-  - 需要有回退链（URL 失败 → 共享目录 → base64）与下载超时 / 大小上限 / token 过期处理。
-  - 收益只对「Docker 且不想挂共享盘」的用户成立；同机部署已由自动兜底覆盖。
+- **出站也走 URL**：现在出站文件依赖共享目录 / 回调 URL；若把「AstrBot 主动来取」反过来做成
+  「DSH 推给 AstrBot 的 /api」，Docker 出站也能免挂盘（收益比对入站小，暂不做）。
+- **`beacon` 只写端口不写 token**：查过 ACL 后判定没必要 —— token 本来就明文躺在
+  `~/.dsh/dsh-astrbot-ingress/config.json` 与 AstrBot 的 `astrbot_plugin_dsh_config.json` 里，
+  去掉 beacon 那份不减少任何暴露面，却会废掉「同机零配置」。真要收紧就管文件 ACL。
 
 ## 出站文件
 
