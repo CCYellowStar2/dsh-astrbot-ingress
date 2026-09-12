@@ -18,7 +18,8 @@ AstrBot 插件另有一个**镜像仓库**，用 `scripts/sync-plugin-mirror.mjs
 ## 发新版本
 
 1. **三处版本一起改**：`package.json` 的 `version`、`astrbot_plugin_dsh/metadata.yaml` 的
-   `version`（形如 `v0.2.1`）、`CHANGELOG.md` 新增版本小节。
+   `version`、`CHANGELOG.md` 新增版本小节。`metadata.yaml` 按 AstrBot 官方示例写**纯语义化版本**
+   （`0.2.1`，不带 `v`——市场用它比对版本号，带前缀可能判不出「已是最新」）。
 2. 跑测试：`npm test`（纯函数单测）与 `npm pack --dry-run`（确认 tarball 内容）。
 3. 推源码仓库：
 
@@ -29,10 +30,13 @@ AstrBot 插件另有一个**镜像仓库**，用 `scripts/sync-plugin-mirror.mjs
 4. 同步镜像仓库：
 
    ```bash
-   gh repo clone CCYellowStar2/astrbot_plugin_dsh /tmp/astrbot_plugin_dsh
-   node scripts/sync-plugin-mirror.mjs /tmp/astrbot_plugin_dsh
-   cd /tmp/astrbot_plugin_dsh && git add -A && git commit -m "v1.2.3" && git push
+   gh repo clone CCYellowStar2/astrbot_plugin_dsh D:\dswk\.mirror\astrbot_plugin_dsh
+   node scripts/sync-plugin-mirror.mjs D:\dswk\.mirror\astrbot_plugin_dsh
+   cd D:\dswk\.mirror\astrbot_plugin_dsh && git add -A && git commit -m "0.2.1" && git push
    ```
+
+   （克隆目录只当临时工作区；本机是 Windows，别用 `/tmp`。同步脚本会把 6 个文件拷过去，
+   里面除 `metadata.yaml` 外的文件常因换行符被判「已修改」，`git diff --stat` 只认真实内容变化。）
 
 5. 发 npm（**可选**，前提是注册了 npm 账号并 `npm login`）：
 
@@ -90,7 +94,19 @@ gh api --method POST -H "Content-Type: application/octet-stream" --input dsh-ast
 
 （`gh release upload` 在本机常因 GraphQL 端点 TLS 超时失败，用上面的 REST 上传更稳。）
 
-## AstrBot 插件市场（可选）
+## AstrBot 插件市场
 
-AstrBot 通过 `metadata.yaml` 的 `repo` / `name` 识别插件。想让别人一键装，把镜像仓库地址
-提交到 AstrBot 的插件索引；用户也可以直接把整个目录拷进 `data/plugins/`。
+AstrBot 用 GitHub 托管插件：市场按 `metadata.yaml` 的 `name` / `repo` 识别并拉取镜像仓库，
+**不需要提 PR**，走网页发布页。
+
+1. 注册 [AstrBot Cloud](https://cloud.astrbot.app) 账号（发布页要求登录）。
+2. 打开 <https://cloud.astrbot.app/publish>，填插件仓库地址
+   `https://github.com/CCYellowStar2/astrbot_plugin_dsh`，提交审核。
+3. 审核要点（[官方文档](https://docs.astrbot.app/dev/star/plugin-publish.html)）：
+   - 压缩包 **≤ 16 MB**（本插件几百 KB，只要别把 `.git` / `__pycache__` 提交进去就没事；
+     镜像仓库已有 `.gitignore` ✅）；
+   - `metadata.yaml` 必填 `name` / `desc` / `version` / `author`，`version` 用语义化版本；
+   - 可选 `short_desc`（紧凑 UI 一句话）/ `social_link` / `tags`（市场分类与搜索）——都已填 ✅。
+
+镜像仓库同时也能当「手动安装」入口：把整个目录拷进 `data/plugins/` 即可，
+AstrBot 的插件管理页也支持直接填仓库地址安装。
