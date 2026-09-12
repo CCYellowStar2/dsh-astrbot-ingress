@@ -1,0 +1,17 @@
+# dsh-astrbot-ingress: HTTP 入站，把 AstrBot（含 OneBot v11）接到本机 DSH Agent。
+- insert:
+    - id: dsh-astrbot-ingress
+      name: dsh-astrbot-ingress
+      config:
+        host: 127.0.0.1
+        port: 3188
+        cwd: ''
+        maxMessageChars: 1500
+        approvalTimeoutSec: 600     # 审批 + 「提问」等你回答的上限；超时都不会替你选
+        reasoningMode: first-line   # off | first-line | full
+        showToolCalls: true         # digest 档里是否把工具次数/名字写进周期汇报
+        toolLineBatch: 5            # full 档：连续工具行合并成一条（1 = 每条单发）
+        # 过程显示档位通常由 AstrBot 插件配置（progress_mode）逐次带过来，
+        # 这里只是请求没带时的兜底，两边默认值保持一致。
+        progressMode: digest        # full | digest | minimal
+        progressIntervalSec: 60     # digest 档的汇报间隔，10-300

@@ -1,0 +1,49 @@
+{
+  "name": "dsh-astrbot-ingress",
+  "version": "0.2.0",
+  "description": "HTTP ingress that lets AstrBot drive DeepSeek Harness agents (OneBot / official IM via AstrBot).",
+  "license": "MIT",
+  "author": "CCYellowStar2",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CCYellowStar2/dsh-astrbot-ingress.git"
+  },
+  "homepage": "https://github.com/CCYellowStar2/dsh-astrbot-ingress#readme",
+  "bugs": {
+    "url": "https://github.com/CCYellowStar2/dsh-astrbot-ingress/issues"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./pure": "./lib/pure.js",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "test": "node --test test/pure.test.js"
+  },
+  "files": [
+    "lib",
+    "skills",
+    "astrbot_plugin_dsh",
+    "docs",
+    "test",
+    "cordis.patch.yml",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "astrbot",
+    "onebot"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "*"
+  }
+}
