@@ -37,6 +37,34 @@ AstrBot 侧要填地址 + token —— 这部分用**信标**抹掉：
 - 纯函数在 `lib/pure.js`（`beaconPayload` / `parseBeacon` / `isBeaconFresh`），有单测；
   Python 侧对应 `read_ingress_beacon` / `_cached_beacon`。
 
+## 正文「慢一拍」：最后一段不能压着等回合结束
+
+症状：QQ 里上一条正文要等下一段正文才出现；严重时上一轮的答案出现在下一轮的流里。两个原因：
+
+1. **每条助手消息的最后一段被压着等 `turn/end`**（只为拼上 `—— 本回合结束`）。中间只要隔着工具阶段
+   （几十秒到几分钟），正文就一直压着。现在只压 `endGraceMs`（默认 1200ms）：`turn/end` 在这段时间内到
+   就合并成一条，到不了就先把正文发出去，结束标记随后单独发。
+2. **旧回合迟到的事件被算到新一轮头上**。事件原本只按 `sessionId` 找回合，而新消息进来时旧回合的 SSE
+   已被掐掉（`被新消息打断`）。DSH 的每个事件都带 `turn: number`（`SessionEventMap` 里 `turn/start`、
+   `turn/end`、`step/*`、`assistant/message`、`tool/call` 都有），所以现在按轮次号归位：被顶掉的旧轮次
+   进 `staleTurns`，它迟到的事件（含 `turn/end`）直接丢掉；打断旧回合时先把压着的正文补发给它自己的流。
+
+复现与验证都用**同一会话「上一条还在跑就发下一条」**的探针（连着 POST 两次 `/inbound`，看两个流各收到什么）：
+
+- 旧行为：`T1 ack → +1252ms 被新消息打断 → 流关闭`；`T2 +534ms 收到 "AAAA ⏎ —— 本回合结束"`。
+- 新行为：`T2 +2402ms 只收到 "BBBB ⏎ —— 本回合结束"`；`trace.log` 里是
+  `supersede turn=6` → `drop-stale turn=6 assistant/message` / `turn=end` → `adopt-turn turn=7`
+  → `turn-end turn=7 held=4 reason=completed`。
+
+排查用的小工具：
+
+- **信标里的 `version` 就是重载指示器**：改完 ingress 代码后，`~/.dsh/astrbot-ingress.json` 的 `version`
+  变了才说明 DSH 侧真的重载了（在 AstrBot 里点重载不算——ingress 是 DSH 宿主插件，得在 DSH 的设置 → 插件里
+  重载，或重启 `dsh web`）。
+- `~/.dsh/dsh-astrbot-ingress/trace.log`：`adopt-turn` / `supersede` / `drop-stale` / `flush-held` /
+  `grace-flush` / `turn-end` 每次一行，超过 1MB 自动归档成 `.old`（`traceLog: false` 可关）。
+- AstrBot 侧对应 `trace_delivery`（`[dsh-trace]` 前缀）：SSE 事件到达时刻 + 每条正文的发送时刻 + passive/active。
+
 ## 长消息分片与代码块
 
 `splitForIm` 切块时看**围栏状态**（`openFence`）：断在未闭合的 ```` ``` ```` 里，就给本条补上闭合、
