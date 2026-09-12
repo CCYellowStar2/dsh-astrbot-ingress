@@ -98,7 +98,36 @@ unhandled rejection。摸内部字段，所以整段包在 try/catch 里：拿�
 
 现在的卸载顺序：① 给还开着的每个 turn 发 `done` + `res.end()`（正常收尾，AstrBot 侧能立刻知道是重载）；
 ② `clearBeacon()`；③ `server.close()` 与 `closeAllConnections()` 并用，并给 `close()` 加 2 秒上限。
-顺带一条排障教训：看到「卸载中」先看看是不是还有长连接挂着 —— 这次就是我自己开的探针 SSE 把它按住的。
+（更正：卡住它的其实是 AstrBot 插件那条 SSE 经 Docker 端口转发过来的连接 —— 也就是**日常场景**，
+只要群里有一条 SSE 开着，卸载就会卡住，不是我以为的「自己开的探针把自己按住了」。）
+
+## `workspaceRegistry` 的真实 API（0.3.9 修两个 bug 时摸清）
+
+**调用方要用的**：
+
+| 成员 | 说明 |
+|---|---|
+| `create(path, title)` | **建或复用**一个工作区：路径过 `fs.realpath` 规范化，要求已存在且是目录；同路径返回既有实体且**不改标题**；新建的排在列表最前 |
+| `resolveByPath(path)` | 只查不建；目录没人认领时返回 `undefined` |
+| `list()` | **同步**（不是 Promise）返回有序实体数组 |
+| `get(id)` / `delete(id)` / `insertBefore(id, beforeId)` | 按 id 取 / 删注册（保留目录与日志）/ 调整顺序 |
+| `archiveSession(id)` / `archivedSessionIds` | 归档；后者是 getter，返回归档 id 数组 |
+| 实体：`attachSession(id)` / `detachSession(id)` / `setTitle(t)` / `insertSessionBefore(a,b)` | 会话记账 |
+| 实体：`sessionIds` | getter，**已经是按会话头的 canonical cwd 过滤过的**（不是原始数组） |
+
+两个坑：
+
+1. **`add()` / `register()` 不存在**。旧代码写的是
+   `if (reg?.add) await reg.add(...) else if (reg?.register) await reg.register(...)` ——
+   两个都是 `undefined`，于是**静默什么都不做**，`/dsh ws <新目录>` 建出来的会话在网页里就一直待在
+   「未分组」那一类，而不是自成一组。教训：对着可选服务写 `if (svc?.method)` 这种防御式调用时，
+   **要么在没有该方法时明确报错/记日志，要么就用真实 API 名字核对一遍** ——
+   否则「防崩」会变成「静默失效」，比崩了还难查（这个 bug 活了很久）。
+2. **归档的会话仍然占着 `sessionIds` 槽位**（DSH 有意为之：取消归档要能回到原位）。
+   直接照着 `sessionIds` 列会话，就会看到「一堆同名会话、只有最新的能切、老的都说会话不存在」。
+   `/dsh ls` 现在同时排掉「在 `archivedSessionIds` 里」和「不在 `sessionPersistence.list()` 里」
+   的条目 —— 后者的判据与 `/dsh use` 能不能接上完全一致（`isPersisted` 用同一个来源），
+   所以**列出来的就一定切得动**。
 
 ## 长消息分片与代码块
 
