@@ -119,23 +119,42 @@ AstrBot 用 GitHub 托管插件：市场按 `metadata.yaml` 的 `name` / `repo` 
   `/reviews` 是审核台。账号限额：同时最多 5 条在审、24 小时最多 10 次提交。
 - **提交后卡在「等待安全检查」是正常的，别重复提交**：那是 Cloud 审核流水线的一站，不是让你过的验证码
   （验证码只出现在登录/提交那一步，是 Turnstile 或 hCaptcha，本机网络可达）。
-  审核台的实现（`_app/reviews-*.js`）是：提交 → LLM 初审（`/admin/reviews/plugins/<slug>/rerun-llm`、
-  `confirm-llm`）→ **安全检查队列**（自动扫代码，产出 `guard_summary` / `guard_findings`，可重跑）
-  → `review-worker` 队列 → 审核员通过/拒绝。审核台里还有个「安全检查前人工确认」开关，
+  **自动提交也会走同一条队列**（推了新版本号时），所以那个状态可能压根不是你点的。
+  流水线是：提交 → LLM 初审（`/admin/reviews/plugins/<slug>/rerun-llm`、`confirm-llm`）
+  → **安全检查队列**（VirusTotal + Claude Code Agent，产出 `guard_summary` / `guard_findings`，可重跑）
+  → `review-worker` 队列 → 通过/拒绝。审核台里还有个「安全检查前人工确认」开关，
   打开时得等审核员点一下版本确认才进队列。用户侧无事可做，等就行。
 - **审核通过后上的是 Cloud 市场**（<https://cloud.astrbot.app/market>，2088 个插件），
   市场会用**镜像仓库的提交**自己打一个 zip 挂出来供一键安装。
-  **本插件的实测记录（2026-09-12）**：08:08 提交 → 08:13 上架，`astrbot_plugin_dsh` / `DSH 桥` /
-  `0.2.0`，`claim_status: claimed`，zip 32 KB（对着镜像仓库 `edf4cb0` 打包，内容干净：
-  `main.py` + `metadata.yaml` + `_conf_schema.json` + README/CHANGELOG/LICENSE，没有 `.git`/`__pycache__`）。
+  **本插件的实测记录（2026-09-12）**：08:08 提交 → 08:13 上架 0.2.0（`edf4cb0`，32 KB）；
+  08:56 推 0.3.0（`5b2901b`）→ **09:03 自动上架 0.3.0**（35 KB）。
+  包里就是仓库内容：`main.py` + `metadata.yaml` + `_conf_schema.json` + README/CHANGELOG/LICENSE，
+  没有 `.git`/`__pycache__`；`claim_status: claimed`。
 - **GitHub 那个集合仓库（AstrBot_Plugins_Collection）已经冻住了**：最后一条同步提交停在
   2026-07-31，我们上架后它并没有新增条目。所以「Cloud 通过后同步进集合仓库」这条老链路别再指望，
   上架以 Cloud 市场为准（下面那条人工 PR 路线因此更没必要了）。
 - **分类是 Cloud 判的，作者选不了**：市场分类只有 三方集成 / 生活 / 工具 / 长期记忆 / 知识库 / 娱乐 / 其他
   这几项（`_app/categories-*.js`），`metadata.yaml` 里写 `category` 也不生效；本插件被判成「其他」。
   真想改得改描述措辞让初审改判，或让审核员手动改——不值得为它折腾，标签和搜索都能找到。
-- **发新版本**：推镜像仓库后到发布页走 **update 模式**（选已有的插件重新解析 GitHub），
-  版本号必须大于已发布版本（前端有 `publish.versionInvalid` 校验），再走一遍审核。
+- **发新版本：只改 `metadata.yaml` 的 `version` 再推镜像仓库就行，Cloud 自己会发**（2026-09-12 实测）：
+  推 0.3.0（`5b2901b`，08:56:09Z）后约 **5 分钟**被扫到（Cloud 09:01:21Z 自动建提交记录），
+  再约 **2 分钟**走完审核并自动发布（09:03:14Z）——作者一个按钮都没点。
+  所以**「发布页显示等待安全检查」不等于没检查就上架**：那正是这次自动提交在队列里，
+  检查过了才写 `published_at`。手动 update 模式（发布页选已有插件重新解析 GitHub，
+  版本号必须大于已发布版本，前端有 `publish.versionInvalid` 校验）仍在，但通常用不上。
+- **「安全检查」具体扫什么**（记录在 `versions[].guard_findings`，两次都判了清白）：
+  - `virustotal`：0.2.0 → `malicious=0, suspicious=0, harmless=0, undetected=63`；0.3.0 → `undetected=65`；
+  - `claude-code`：一个 agent 读代码写结论，明确认可「botpy monkeypatch 是为读取官方引用附件的合法用途」
+    「无 eval/exec、无外泄、网络只到用户配置的本地端点」，并确认**没有针对审核员的 prompt injection**。
+- **查最新状态用 slug 详情接口**（列表接口会被 CDN 缓存，可能还给你上一版）：
+
+  ```bash
+  curl -s 'https://cloud.astrbot.app/api/v1/market/plugins/ccyellowstar2-astrbot-plugin-dsh-3f975a0741e1daf3' \
+    | jq '.data | {latest_version, published_version,
+                   versions: [.versions[] | {version, status, queue_status, published_at, guard_summary}]}'
+  ```
+
+  这里有每个版本的 `status` / `queue_status` / `guard_findings` / `published_at`。
 - 已上架与否可以自查（公开接口，无需登录）：
 
   ```bash
