@@ -18,3 +18,7 @@
         # 把实际端口 + token 写进 ~/.dsh/astrbot-ingress.json（0600），
         # 同机的 AstrBot 插件自动读它 → ingress_url / token 留空即可。
         beacon: true
+        # 每条助手消息的**最后一段**只压这么久（毫秒）等 turn/end 来拼「—— 本回合结束」；
+        # 等不到就先把正文发出去。从前是压到「下一段正文/回合结束」才发 —— 中间隔着长
+        # 工具阶段时正文会被压几分钟（「正文慢一拍」的根因）。
+        endGraceMs: 1200

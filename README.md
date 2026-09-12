@@ -72,6 +72,7 @@ Token 写在 `%DSH_HOME%/dsh-astrbot-ingress/config.json`（Linux/macOS 通常�
 | `showToolCalls` | 开 | `full` 档是否发工具行；`digest` 档是否把工具次数写进汇报 |
 | `toolLineBatch` | 5 | `full` 档连续工具行并成一条（1 = 每条单发） |
 | `beacon` | 开 | 把实际端口与 token 写进 `%DSH_HOME%/astrbot-ingress.json`（0600），供同机 AstrBot 自动发现；不想写就设 `false` |
+| `endGraceMs` | 1200 | 每条助手消息的**最后一段**只压这么久等 `turn/end` 来拼 `—— 本回合结束`；等不到就先发正文。**别设太大**（设成几千毫秒就会重新出现「正文慢一拍」的手感） |
 
 过程档位通常由 AstrBot 侧的 `progress_mode` 逐次带过来，这里的值只是「请求没带」时的兜底：
 
