@@ -15,3 +15,6 @@
         # 这里只是请求没带时的兜底，两边默认值保持一致。
         progressMode: digest        # full | digest | minimal
         progressIntervalSec: 60     # digest 档的汇报间隔，10-300
+        # 把实际端口 + token 写进 ~/.dsh/astrbot-ingress.json（0600），
+        # 同机的 AstrBot 插件自动读它 → ingress_url / token 留空即可。
+        beacon: true

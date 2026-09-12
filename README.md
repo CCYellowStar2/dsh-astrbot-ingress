@@ -32,11 +32,15 @@ dsh-astrbot-ingress: listening on http://127.0.0.1:3188
 ```
 
 Token 写在 `%DSH_HOME%/dsh-astrbot-ingress/config.json`（Linux/macOS 通常是 `~/.dsh/dsh-astrbot-ingress/config.json`）。
+顺手还会把**实际端口 + token**写进 `%DSH_HOME%/astrbot-ingress.json`（0600，每 30 秒刷新），
+**同机**的 AstrBot 插件自动读它——所以同机部署不用手填地址和 token。
 
 ### 2. AstrBot 侧插件
 
 把 `astrbot_plugin_dsh/` 拷进 AstrBot 的 `data/plugins/`（或在 AstrBot WebUI 的插件页用仓库地址
-`https://github.com/CCYellowStar2/astrbot_plugin_dsh` 安装），再重载插件、填上 token 与 ingress 地址（见下）。插件自身的说明见 [`astrbot_plugin_dsh`](https://github.com/CCYellowStar2/astrbot_plugin_dsh)。
+`https://github.com/CCYellowStar2/astrbot_plugin_dsh` 安装），再重载插件。**同机**：`ingress_url` 与
+`token` 留空即可（自动读上面的信标文件）；**AstrBot 在容器里**：填 `http://host.docker.internal:3188`
+与手抄的 token。插件自身的说明见 [`astrbot_plugin_dsh`](https://github.com/CCYellowStar2/astrbot_plugin_dsh)。
 
 ## 配置
 
@@ -53,6 +57,7 @@ Token 写在 `%DSH_HOME%/dsh-astrbot-ingress/config.json`（Linux/macOS 通常�
     toolLineBatch: 5
     progressMode: digest      # digest | full | minimal
     progressIntervalSec: 60   # 10-300
+    beacon: true              # 写 ~/.dsh/astrbot-ingress.json（端口+token）供同机 AstrBot 自动发现
 ```
 
 | 项 | 默认 | 说明 |
@@ -66,6 +71,7 @@ Token 写在 `%DSH_HOME%/dsh-astrbot-ingress/config.json`（Linux/macOS 通常�
 | `reasoningMode` | `first-line` | 思考内容：`off` / 只发第一行 / `full` 全文 |
 | `showToolCalls` | 开 | `full` 档是否发工具行；`digest` 档是否把工具次数写进汇报 |
 | `toolLineBatch` | 5 | `full` 档连续工具行并成一条（1 = 每条单发） |
+| `beacon` | 开 | 把实际端口与 token 写进 `%DSH_HOME%/astrbot-ingress.json`（0600），供同机 AstrBot 自动发现；不想写就设 `false` |
 
 过程档位通常由 AstrBot 侧的 `progress_mode` 逐次带过来，这里的值只是「请求没带」时的兜底：
 
@@ -81,8 +87,8 @@ Token 写在 `%DSH_HOME%/dsh-astrbot-ingress/config.json`（Linux/macOS 通常�
 
 | 项 | 同机 | AstrBot 在 Docker、DSH 在宿主机 |
 |---|---|---|
-| `ingress_url` | `http://127.0.0.1:3188` | `http://host.docker.internal:3188`（Linux 可能要 `--add-host=host.docker.internal:host-gateway`） |
-| `token` | 与 DSH `config.json` 相同 | 相同 |
+| `ingress_url` | **留空**（自动读 `%DSH_HOME%/astrbot-ingress.json` 里的实际端口） | `http://host.docker.internal:3188`（Linux 可能要 `--add-host=host.docker.internal:host-gateway`） |
+| `token` | **留空**（同上，从信标里读） | 与 DSH `config.json` 相同 |
 | `allow_users` / `allow_groups` | 空 = 仅管理员 | 同左 |
 | `send_file_mode` | `direct` | `shared` 或 `auto` |
 | `send_protocol_path` | 留空 | 协议端能读的发件目录，如 `/app/napcat/data/dsh-outbox`、`/app/snowluma-data/dsh-outbox` |

@@ -6,12 +6,16 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import {
+  beaconPayload,
   extractSendFiles,
   firstThinkingLine,
   formatElapsed,
   formatQuestions,
+  isBeaconFresh,
   isPathAllowedForSend,
   looksLikeBridgeCommand,
+  openFence,
+  parseBeacon,
   parseQuestionReply,
   progressDigestLine,
   reasoningOfAssistantMessage,
@@ -128,6 +132,62 @@ test('splitForIm: 超长文本按上限切分且不丢内容', () => {
   assert.ok(chunks.length > 1)
   for (const chunk of chunks) assert.ok(chunk.length <= 30, `chunk too long: ${chunk.length}`)
   assert.equal(chunks.join('').replace(/\s/g, ''), text.replace(/\s/g, ''))
+})
+
+test('openFence: 判断文本结尾是否还在代码块里', () => {
+  assert.equal(openFence('普通文本'), null)
+  assert.equal(openFence('前\n```js\nconst a = 1'), 'js')
+  assert.equal(openFence('```js\nconst a = 1\n```'), null)
+  assert.equal(openFence('```\na\n```\n散文字\n```\nb'), '') // 无语言标签
+  assert.equal(openFence('行内 ``` 不算围栏'), null)
+})
+
+test('splitForIm: 长代码块分片时每条围栏都成对，续片保留语言标签', () => {
+  const code = Array.from({ length: 30 }, (_, i) => `print(${i})`).join('\n')
+  const text = `看这段：\n\`\`\`python\n${code}\n\`\`\`\n跑完了。`
+  const chunks = splitForIm(text, 60)
+  assert.ok(chunks.length > 2, `应该切成多片，实际 ${chunks.length}`)
+  for (const c of chunks) {
+    assert.ok(c.length <= 60, `超长: ${c.length}`)
+    const fences = (c.match(/^[ \t]*```/gm) || []).length
+    assert.equal(fences % 2, 0, `围栏不成对: ${JSON.stringify(c)}`)
+  }
+  assert.ok(chunks.some((c) => c.startsWith('```python')), '续片应重新打开代码块')
+  // 抹掉所有围栏行之后，内容必须一字不差
+  const strip = (s) => s.replace(/^[ \t]*```.*$/gm, '').replace(/\s+/g, '')
+  assert.equal(strip(chunks.join('\n')), strip(text))
+})
+
+test('splitForIm: 原文自身就没闭合的代码块，尾片保持打开', () => {
+  const text = `说明\n\`\`\`bash\n${Array.from({ length: 20 }, (_, i) => `echo ${i}`).join('\n')}`
+  const chunks = splitForIm(text, 50)
+  const last = chunks[chunks.length - 1]
+  assert.equal((last.match(/^[ \t]*```/gm) || []).length % 2, 1, '尾片应仍在代码块里')
+})
+
+test('beaconPayload / parseBeacon / isBeaconFresh: 信标内容与新鲜度', () => {
+  const now = Date.parse('2026-09-12T08:00:00Z')
+  const b = beaconPayload(
+    { port: 3188, token: 'tok', version: '0.3.0', cwd: 'D:\\dswk', pid: 42 },
+    now,
+  )
+  assert.equal(b.kind, 'dsh-astrbot-ingress')
+  assert.equal(b.url, 'http://127.0.0.1:3188')
+  assert.equal(b.port, 3188)
+  assert.equal(b.updatedAt, '2026-09-12T08:00:00.000Z')
+  assert.deepEqual(parseBeacon(JSON.stringify(b)), b)
+
+  assert.equal(parseBeacon('not json'), null)
+  assert.equal(parseBeacon('{"kind":"other","port":1}'), null)
+  assert.equal(parseBeacon('[]'), null)
+  assert.equal(parseBeacon(''), null)
+
+  assert.equal(isBeaconFresh(b, now + 60_000), true)
+  assert.equal(isBeaconFresh(b, now + 11 * 60_000), false)
+  assert.equal(isBeaconFresh(b, now - 30_000), true) // 时钟稍快
+  assert.equal(isBeaconFresh(b, now - 120_000), false) // 时钟太离谱
+  assert.equal(isBeaconFresh({}, now), false)
+  assert.equal(isBeaconFresh(beaconPayload({ port: 1 }, now), now), true)
 })
 
 test('textOfAssistantMessage: reasoning 块不算正文', () => {

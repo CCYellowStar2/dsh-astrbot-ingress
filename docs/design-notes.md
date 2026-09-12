@@ -16,6 +16,33 @@
 所有按 umo 索引的状态自动跟着隔离。反过来也说明：**默认 `group` 模式下没有「只有我」这个维度** ——
 键是群级的，想按人分只能在键上动手。
 
+## 同机零配置（信标文件）
+
+为什么不像市面上那几个插件那样直接调 DSH 的 `/api`？**因为那道门要签名 cookie**：DSH 的本地网关
+给每个进程发一个随机 launch token（只在内存里，唯一出口是 `dsh web` 打印的 `/?token=…`），
+`/api` 请求先过 Host/Origin 再验 cookie，没有就 401。2026-09-12 在本机 0.1.5-rc.1 上实测：
+`/api/host.describe`、`/api/host/describe`、`/api/session/list`、带 `args` 包裹、加
+`Origin` / `Referer` / `?token=` / 伪造 cookie —— **全部 401**。所以「零安装纯 HTTP 客户端」这条路
+第三方插件拿不到东西（市场上那三个插件的代码里也确实没有任何 cookie/token 处理）。
+
+我们反过来：**插件跑在 DSH 进程里**（`ctx` 级权限，能订阅 `session/event`、`approval/request`、
+`user-questions/request`），再自己开一个带 Bearer token 的本地 HTTP 服务给 AstrBot。代价是
+AstrBot 侧要填地址 + token —— 这部分用**信标**抹掉：
+
+- ingress 启动后把 `{kind, version, host, port, url, token, cwd, pid, updatedAt}` 写进
+  `%DSH_HOME%/astrbot-ingress.json`（0600），每 30 秒刷新，退出时删掉自己的（pid 不符就不动）。
+- AstrBot 插件在 `ingress_url` / `token` 留空时读它（60 秒缓存；`updatedAt` 超过 10 分钟、
+  或 `kind` 不是 `dsh-astrbot-ingress` 都当没有），读不到才回退 `127.0.0.1:3188`。
+- **只在同机成立**：AstrBot 在容器里看不到宿主机 home，那种部署照旧手填 `host.docker.internal`。
+- 纯函数在 `lib/pure.js`（`beaconPayload` / `parseBeacon` / `isBeaconFresh`），有单测；
+  Python 侧对应 `read_ingress_beacon` / `_cached_beacon`。
+
+## 长消息分片与代码块
+
+`splitForIm` 切块时看**围栏状态**（`openFence`）：断在未闭合的 ```` ``` ```` 里，就给本条补上闭合、
+下一条用原语言标签重新打开。不这么做的话，长代码块被腰斩后两边各自渲染成一坨。注意判断要带上
+「上一条带过来的 pending 围栏」，只看当前 head 会漏掉续片的闭合（写的时候踩过）。
+
 ## 过程显示（`progress_mode`）
 
 - **档位由 AstrBot 侧决定、ingress 执行**：插件把 `progress_mode` / `progress_interval_sec`
