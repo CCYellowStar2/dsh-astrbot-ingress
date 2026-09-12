@@ -69,6 +69,36 @@ AstrBot 侧要填地址 + token —— 这部分用**信标**抹掉：
 - AstrBot 侧对应 `trace_delivery`（`[dsh-trace]` 前缀）：SSE 事件到达时刻 + 每条正文的发送时刻 + passive/active。
 - **两个开关自 0.3.7 起默认关**（`traceLog: false` / `trace_delivery: false`）：慢一拍定位完成、实机验证
   通过后就不再常开 —— 平时白写磁盘、白占日志，排障时临时打开即可，排完记得关回去。
+- **`/health` 的 `capabilities` 是唯一可靠的「活代码版本」判据**（0.3.8 起）：信标里的 `version` 是
+  每次刷新现读磁盘 `package.json`，旧代码也会报新号；而 `capabilities` 写在代码里，读到的就是**正在跑的**
+  那份代码支持什么。重载前后对比它，比对着 pid 猜靠谱。
+
+## 提问卡片：两边并行 + 谁先答都要收卡片（0.3.8）
+
+`ask_user_question` 走 `user-questions/request` 这条 waterfall：我们是 `prepend` 的监听者，**先把问题
+发到 QQ，同时也调 `next()` 让网页端照常渲染**（独占过一版，用户同时开着网页时那张卡片点不了）。
+
+坑在于**网页端的卡片只认自己那套生命周期**：`dsh-client-ui-user-questions` 在客户端注册一个 pending
+interaction，只有 ① 它自己答了、或 ② host 给它发 cancel 帧，才会把卡片撤掉。我们在 QQ 侧抢先答完之后，
+Cordis 那条 waterfall 已经返回了，但 gateway 里那条「转发给浏览器的待答事件」还挂着 —— 客户端什么都不知道，
+卡片就永远留在输入区（实测：等到 10 分钟超时、模型都接着往下说完、整轮结束了，卡片还在）。
+
+修法：QQ 侧一旦定下来（`answer` / `cancel` / `timeout`），就按 agent 在 `typertGateway.pendingRemoteEvents`
+里找到那条事件，用 `settleRemoteEvent`（收到回答）或 `cancelRemoteEvent`（取消 / 超时）把它结掉 ——
+gateway 的 `finishRemoteEvent` 会给每个客户端推 `{type:'cancel', eventId}`，卡片随之消失。
+`cancelRemoteEvent` 会让下游那个 promise 失败，但调用方（我们的 `next()`）本来就挂了 `.catch`，不会变成
+unhandled rejection。摸内部字段，所以整段包在 try/catch 里：拿不到就静默跳过，最坏是卡片多留一会儿。
+
+## 卸载为什么一定要先收 SSE（0.3.8）
+
+`server.close()` 的语义是「停止接受新连接，然后等**已有**连接结束」。QQ 那条 SSE 是长连接，可能挂着一整个
+回合（几分钟到几十分钟），于是 `close()` 的回调永远不来 —— `ctx.effect` 的卸载函数卡住，插件在 DSH 的插件
+列表里显示「卸载中」，`3188` 端口没了、信标被清掉，而且**之后每次热重载都卡在同一个点**（本次排障就是先被
+它绊住，误判成「改动没生效」）。
+
+现在的卸载顺序：① 给还开着的每个 turn 发 `done` + `res.end()`（正常收尾，AstrBot 侧能立刻知道是重载）；
+② `clearBeacon()`；③ `server.close()` 与 `closeAllConnections()` 并用，并给 `close()` 加 2 秒上限。
+顺带一条排障教训：看到「卸载中」先看看是不是还有长连接挂着 —— 这次就是我自己开的探针 SSE 把它按住的。
 
 ## 长消息分片与代码块
 
