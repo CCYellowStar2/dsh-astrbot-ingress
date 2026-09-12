@@ -169,6 +169,12 @@ Docker 部署不想挂共享盘时走这条：插件把附件登记成 AstrBot �
   - **token 是单次消费的**（`FileTokenService.handle_file()` 里 `staged_files.pop`），
     所以探测用的一次性 token 与真传用的必须**各登记一次**，不能复用。
   - 都不通时会在聊天里提醒一次并列出试过哪些地址 —— 比只说「太大」可操作得多。
+- **⚠️ 探测请求必须用 `httpx.AsyncClient`（死锁坑，2026-09-12 实测）**：探测跑在 AstrBot 的事件循环里，
+  而 ingress 要取的 `/api/file/<token>` 正是**同一个进程的 dashboard** 提供的 —— 用同步 `httpx.Client`
+  会把事件循环占住，变成「我等我自己」，探测**必然稳稳超时**。
+  现象很迷惑：真 token 每次都卡满 5 秒超时（还被日志误报成「不可达」），而**假 token 秒回 404**
+  ——因为那条路不需要读文件，dashboard 有空回。教训：**在 AstrBot 插件里发 HTTP 请求，只要目标可能是
+  自己的 HTTP 服务，就必须异步。**
 - 出站不受影响（出站仍走共享目录或 AstrBot 的回调 URL）。
 
 ## 未来改进（尚未实现）
