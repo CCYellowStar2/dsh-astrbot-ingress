@@ -65,8 +65,10 @@ AstrBot 侧要填地址 + token —— 这部分用**信标**抹掉：
   在 AstrBot 里点重载**不算** DSH 侧重载 —— ingress 是 DSH 宿主插件，得在 DSH 的设置 → 插件里重载，
   或重启 `dsh web`。
 - `~/.dsh/dsh-astrbot-ingress/trace.log`：`adopt-turn` / `supersede` / `drop-stale` / `flush-held` /
-  `grace-flush` / `turn-end` 每次一行，超过 1MB 自动归档成 `.old`（`traceLog: false` 可关）。
+  `grace-flush` / `turn-end` 每次一行，超过 1MB 自动归档成 `.old`。
 - AstrBot 侧对应 `trace_delivery`（`[dsh-trace]` 前缀）：SSE 事件到达时刻 + 每条正文的发送时刻 + passive/active。
+- **两个开关自 0.3.7 起默认关**（`traceLog: false` / `trace_delivery: false`）：慢一拍定位完成、实机验证
+  通过后就不再常开 —— 平时白写磁盘、白占日志，排障时临时打开即可，排完记得关回去。
 
 ## 长消息分片与代码块
 

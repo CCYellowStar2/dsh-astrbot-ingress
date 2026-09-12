@@ -12,6 +12,44 @@ QQ / NapCat ──OneBot──▶ AstrBot ──HTTP──▶ 本插件 :3188 �
 
 不绑定某一台电脑的盘符：同机、Docker、换工作区都只改配置。
 
+## 快速开始（只有一个必填项）
+
+```bash
+# ① DSH 侧
+dsh plugin --profile web add github:CCYellowStar2/dsh-astrbot-ingress
+# 重启 dsh web；控制台出现 "listening on http://127.0.0.1:3188" 即成功
+```
+
+② AstrBot 侧装 [`astrbot_plugin_dsh`](https://github.com/CCYellowStar2/astrbot_plugin_dsh)
+（WebUI 插件页填仓库地址，或在插件市场搜「DSH 桥」），重载插件。
+
+③ **唯一要填的配置是 `token`**：抄 `%DSH_HOME%/dsh-astrbot-ingress/config.json` 里的那段，粘进
+AstrBot 插件配置的 `token`。（AstrBot 与 DSH 同一台机器时**连这个都能留空** —— 插件会读
+`%DSH_HOME%/astrbot-ingress.json` 这个信标文件。）
+
+④ 回聊天窗口发 `/dsh 你好`。
+
+**地址不用填**：`ingress_url` 留空时会自己探 —— 同机信标文件 → `host.docker.internal:3188` →
+`127.0.0.1:3188` → 你列的候选，`/health` 第一个通的才用。**文件也不用挂盘**：入站大附件走一次性
+URL（`/api/file/<token>`，DSH 自己下载），出站文件这边看不到时插件向 ingress 要一次性凭证拉过来再发。
+
+| 你的情况 | 除了 `token` 还要填什么 |
+|---|---|
+| AstrBot 与 DSH 同一台机器 | **什么都不用**（`token` 也留空） |
+| AstrBot 在 Docker、DSH 在宿主机（官方 compose） | **只填 `token`** |
+| Linux 上的 Docker | 同上 + compose 加 `extra_hosts: ["host.docker.internal:host-gateway"]` |
+| 宿主机映射端口不是 `6185`（如 `6185 → 10000`） | `inbound_url_candidates` 填宿主端口（`10000`）—— 只影响走 URL 的那条入站通道 |
+| ingress 不在 `3188` / 不在同一台机器 | `ingress_url`（或 `ingress_url_candidates`） |
+| AstrBot 与协议端（NapCat/SnowLuma）分容器且挂载点不同名 | `send_protocol_path`（+ 需要时 `send_outbox_dir`） |
+
+```yaml
+# compose 里给 AstrBot 的那两行（Linux 才需要；Windows/macOS 的 Docker Desktop 自带）
+services:
+  astrbot:
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+```
+
 ## 安装
 
 ### 1. DSH 侧插件
@@ -76,6 +114,7 @@ Token 写在 `%DSH_HOME%/dsh-astrbot-ingress/config.json`（Linux/macOS 通常�
 | `inboundUrlTimeoutMs` | 60000 | 单个 URL 的下载超时 |
 | `outboundUrlMaxMb` | 200 | 出站文件「拉取凭证」的单文件上限（AstrBot 侧 `outbound_pull_max_mb` 也要够） |
 | `endGraceMs` | 1200 | 每条助手消息的**最后一段**只压这么久等 `turn/end` 来拼 `—— 本回合结束`；等不到就先发正文。**别设太大**（设成几千毫秒就会重新出现「正文慢一拍」的手感） |
+| `traceLog` | 关 | 诊断追踪：把 `adopt-turn` / `drop-stale` / `grace-flush` / `turn-end` 写进 `%DSH_HOME%/dsh-astrbot-ingress/trace.log`（>1MB 自动归档 `.old`）。只在排查跨进程时序时开 |
 
 过程档位通常由 AstrBot 侧的 `progress_mode` 逐次带过来，这里的值只是「请求没带」时的兜底：
 
@@ -91,23 +130,27 @@ Token 写在 `%DSH_HOME%/dsh-astrbot-ingress/config.json`（Linux/macOS 通常�
 
 | 项 | 同机 | AstrBot 在 Docker、DSH 在宿主机 |
 |---|---|---|
-| `ingress_url` | **留空**（自动读 `%DSH_HOME%/astrbot-ingress.json` 里的实际端口） | `http://host.docker.internal:3188`（Linux 可能要 `--add-host=host.docker.internal:host-gateway`） |
-| `token` | **留空**（同上，从信标里读） | 与 DSH `config.json` 相同 |
+| `ingress_url` | **留空**（自动读 `%DSH_HOME%/astrbot-ingress.json` 里的实际端口） | **一般也留空**（自动探 `host.docker.internal:3188`）；只有 ingress 不在默认端口 / 不在本机才手填 |
+| `token` | **留空**（同上，从信标里读） | 与 DSH `config.json` 相同（**唯一的必填项**） |
 | `allow_users` / `allow_groups` | 空 = 仅管理员 | 同左 |
-| `send_file_mode` | `direct` | `shared` 或 `auto` |
-| `send_protocol_path` | 留空 | 协议端能读的发件目录，如 `/app/napcat/data/dsh-outbox`、`/app/snowluma-data/dsh-outbox` |
+| `send_file_mode` | `direct` | `auto`（出站文件有拉取兜底；出站图片 / 视频要共享目录时才填 `shared`） |
+| `send_protocol_path` | 留空 | 出站图片 / 视频要落盘给协议端时填，如 `/app/napcat/data/dsh-outbox`、`/app/snowluma-data/dsh-outbox` |
 | `send_outbox_dir` | 留空 | 仅当两边**挂载点不同名**时填（AstrBot 侧那个名字） |
 | `inbound_share_dir` | 留空 | 入站大文件（>12MB）暂存目录（AstrBot 侧）。**同机留空即可** —— 自动用 DSH 当前工作区下的 `.dsh-inbox`；分容器才填，如 `/mnt/d/proj/.dsh-inbox` |
 | `inbound_dsh_prefix` | 留空 | 仅分容器时填：同一目录在 DSH 侧的写法，如 `D:\proj\.dsh-inbox`（同机两边是同一个路径） |
-| `inbound_url_base` | 留空 = 关 | **URL 入站**：DSH 能访问到的 AstrBot 基址（宿主视角），如 `http://127.0.0.1:10000`。填了它大附件就不用挂共享盘 |
-| `inbound_url_candidates` | 空 | URL 入站的候选（裸端口或完整地址）。留空时只用本机 dashboard 端口 |
+| `inbound_url_base` | 留空 = 自动探测 | **URL 入站**：DSH 能访问到的 AstrBot 基址（**宿主视角**），如 `http://127.0.0.1:10000`。填了就固定用它 |
+| `inbound_url_candidates` | 空 | URL 入站的候选（裸端口或完整地址）。宿主机映射端口不是 6185 时写这里，如 `10000`；插件会让 DSH 侧先真取一次，第一个通的才用 |
 | `ingress_url_candidates` | 空 | ingress 地址的额外候选；留空时内置 `host.docker.internal:3188` / `127.0.0.1:3188`，自动探测 |
 | `outbound_pull` | 开 | 出站文件本地看不到时从 ingress 拉（Docker 下免挂盘） |
 | `inbound_url_mode` | `auto` | `auto`=只有 >12MB 走 URL；`always`=全走；`off`=关 |
+| `trace_delivery` | 关 | 诊断：每轮在 AstrBot 日志里多几行 `[dsh-trace]`（排「慢一拍」「顺序不对」时开） |
 
-**推荐零配置方案**：在 AstrBot 主配置里填 `callback_api_base`（如 `http://astrbot:6185`），出站文件 / 图片 / 视频会注册成 URL 交给协议端下载 —— **不需要共享盘**，也不用管两边挂载点是否同名。没填时，「AstrBot 与协议端分容器」就必须挂共享目录并填 `send_protocol_path`。
+**大多数情况不用管这一节**：只填 `token`，出站文件走上面的 `outbound_pull` 兜底、入站大附件走 URL，
+挂盘是可选的老办法。还有一种通用做法是填 AstrBot 主配置的 `callback_api_base`（协议端能访问到的地址，
+如 `http://astrbot:6185`）—— 出站图片 / 视频也会注册成 URL 交给协议端下载。两者都没配、且协议端与 AstrBot
+分容器时，才需要共享目录并填 `send_protocol_path`。
 
-Docker 部署要在 compose 里把共享目录挂上（配置里填的都是容器内视角）。**同一块盘在两个容器里挂成同一个路径**最省事：
+要挂共享目录时，配置里填的都是容器内视角，在 compose 里把同一块盘挂成同一个路径最省事：
 
 ```yaml
 services:

@@ -28,3 +28,7 @@
         inboundUrlTimeoutMs: 60000
         # 出站文件「拉取凭证」（AstrBot 看不见文件时自己来取）的单文件上限：
         outboundUrlMaxMb: 200
+        # 诊断追踪：默认关。打开后把 adopt-turn / drop-stale / grace-flush / turn-end
+        # 每次一行写进 ~/.dsh/dsh-astrbot-ingress/trace.log（超过 1MB 自动归档 .old）。
+        # 只在排查「正文慢一拍」这类跨进程时序问题时开。
+        traceLog: false
