@@ -110,3 +110,29 @@ AstrBot 用 GitHub 托管插件：市场按 `metadata.yaml` 的 `name` / `repo` 
 
 镜像仓库同时也能当「手动安装」入口：把整个目录拷进 `data/plugins/` 即可，
 AstrBot 的插件管理页也支持直接填仓库地址安装。
+
+### 发布页的等价人工路线（本仓库实际走的那条）
+
+发布页本质就是往 [AstrBotDevs/AstrBot_Plugins_Collection](https://github.com/AstrBotDevs/AstrBot_Plugins_Collection)
+的 `plugins.json` 追加一条（最新的几条 PR 都是这个形状），所以不用 Cloud 账号也能发：
+
+1. `gh repo fork AstrBotDevs/AstrBot_Plugins_Collection --clone=false`
+2. 克隆自己的 fork，在 `plugins.json` **末尾**追加 `astrbot_plugin_dsh` 一条
+   （字段：`display_name` / `short_desc` / `desc` / `author` / `repo` / `category` / `tags` / `social_link`；
+   文件很长但**不按字母序**，新条目一律追加在最后，diff 才干净）。
+3. 提 PR。CI 三件事：`jq` 过一遍 JSON、`curl -I` 每个 `repo` URL 可达、
+   `scripts/validate_plugins/run.py` 把**改动的**插件 clone 下来用 AstrBot 真加载一次。
+4. 首次贡献者的 workflow 会停在 `action_required`，等维护者点批准；PR 挂在那里就是「审核中」。
+
+冒烟校验可以本地复现（用容器里现成的 AstrBot 源码树，不必等 CI）：
+
+```bash
+docker cp <fork>/scripts astrbot:/tmp/dsh-validate/scripts
+docker cp <fork>/plugins.json astrbot:/tmp/dsh-validate/plugins.json
+docker exec astrbot sh -lc 'cd /tmp/dsh-validate && python scripts/validate_plugins/run.py \
+  --astrbot-path /AstrBot --plugin-name astrbot_plugin_dsh --report-path /tmp/dsh-validate/report.json'
+```
+
+坑：校验脚本要求插件**仓库根目录**直接有 `main.py` + `metadata.yaml`（本仓库满足）；
+不要求 `category`，但市场分类靠它，取值只有 `entertainment` / `utilities` / `ai_tools` /
+`integrations` / `productivity`。
