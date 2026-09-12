@@ -123,10 +123,19 @@ AstrBot 用 GitHub 托管插件：市场按 `metadata.yaml` 的 `name` / `repo` 
   `confirm-llm`）→ **安全检查队列**（自动扫代码，产出 `guard_summary` / `guard_findings`，可重跑）
   → `review-worker` 队列 → 审核员通过/拒绝。审核台里还有个「安全检查前人工确认」开关，
   打开时得等审核员点一下版本确认才进队列。用户侧无事可做，等就行。
-- **审核通过后**才由 `astrbot-plugin-copybara[bot]` 往 GitHub 的
-  [AstrBot_Plugins_Collection](https://github.com/AstrBotDevs/AstrBot_Plugins_Collection)
-  同步（仓库里那些 `Sync plugin: xxx` 的自动提交就是它），并出现在市场
-  <https://cloud.astrbot.app/market>（2088 个插件）。所以「提交后没动静」是正常的。
+- **审核通过后上的是 Cloud 市场**（<https://cloud.astrbot.app/market>，2088 个插件），
+  市场会用**镜像仓库的提交**自己打一个 zip 挂出来供一键安装。
+  **本插件的实测记录（2026-09-12）**：08:08 提交 → 08:13 上架，`astrbot_plugin_dsh` / `DSH 桥` /
+  `0.2.0`，`claim_status: claimed`，zip 32 KB（对着镜像仓库 `edf4cb0` 打包，内容干净：
+  `main.py` + `metadata.yaml` + `_conf_schema.json` + README/CHANGELOG/LICENSE，没有 `.git`/`__pycache__`）。
+- **GitHub 那个集合仓库（AstrBot_Plugins_Collection）已经冻住了**：最后一条同步提交停在
+  2026-07-31，我们上架后它并没有新增条目。所以「Cloud 通过后同步进集合仓库」这条老链路别再指望，
+  上架以 Cloud 市场为准（下面那条人工 PR 路线因此更没必要了）。
+- **分类是 Cloud 判的，作者选不了**：市场分类只有 三方集成 / 生活 / 工具 / 长期记忆 / 知识库 / 娱乐 / 其他
+  这几项（`_app/categories-*.js`），`metadata.yaml` 里写 `category` 也不生效；本插件被判成「其他」。
+  真想改得改描述措辞让初审改判，或让审核员手动改——不值得为它折腾，标签和搜索都能找到。
+- **发新版本**：推镜像仓库后到发布页走 **update 模式**（选已有的插件重新解析 GitHub），
+  版本号必须大于已发布版本（前端有 `publish.versionInvalid` 校验），再走一遍审核。
 - 已上架与否可以自查（公开接口，无需登录）：
 
   ```bash
@@ -138,12 +147,12 @@ AstrBot 用 GitHub 托管插件：市场按 `metadata.yaml` 的 `name` / `repo` 
 镜像仓库同时也能当「手动安装」入口：把整个目录拷进 `data/plugins/` 即可，
 AstrBot 的插件管理页也支持直接填仓库地址安装。
 
-### 备选：人工 PR（**没走这条**，留作应急）
+### 备选：人工 PR（**别走这条了**，留个记录）
 
 发布页的事本质就是往 [AstrBotDevs/AstrBot_Plugins_Collection](https://github.com/AstrBotDevs/AstrBot_Plugins_Collection)
 的 `plugins.json` 追加一条，所以没有 Cloud 账号也能发 PR（2026-09-12 试过一条：PR #2114，
-Sourcery 通过、`Validate Plugin Smoke` 停在 `action_required`），但**既然要发就按官方流程发**，
-那条 PR 已关闭——同一条目两个 PR 都合并会让 `plugins.json` 出重复键。
+Sourcery 通过、`Validate Plugin Smoke` 停在 `action_required`，随后关闭）。
+但那仓库**自 2026-07-31 起就没再同步过**，市场早改由 Cloud 驱动，提了也不会生效——应急才用。
 
 真要走这条时的步骤与坑：
 
