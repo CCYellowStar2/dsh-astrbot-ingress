@@ -125,9 +125,20 @@ unhandled rejection。摸内部字段，所以整段包在 try/catch 里：拿�
    否则「防崩」会变成「静默失效」，比崩了还难查（这个 bug 活了很久）。
 2. **归档的会话仍然占着 `sessionIds` 槽位**（DSH 有意为之：取消归档要能回到原位）。
    直接照着 `sessionIds` 列会话，就会看到「一堆同名会话、只有最新的能切、老的都说会话不存在」。
-   `/dsh ls` 现在同时排掉「在 `archivedSessionIds` 里」和「不在 `sessionPersistence.list()` 里」
-   的条目 —— 后者的判据与 `/dsh use` 能不能接上完全一致（`isPersisted` 用同一个来源），
-   所以**列出来的就一定切得动**。
+   `/dsh ls` 现在排掉「在 `archivedSessionIds` 里」的条目。
+
+## `sessionPersistence` / `sessionTitle` 的真实形状（0.3.10 才搞对）
+
+| 想要什么 | 正确写法 | 坑 |
+|---|---|---|
+| 这个会话在磁盘上存在吗 | `await sessionPersistence.stat(id)` → `{header, revision, sizeBytes}` 或 `undefined` | 老代码用 `list()` 然后判 `h.id === sessionId` —— **永远 false**。因为 `list()` 返回的是**快照**（`{header, ...}`），id 在 `header.id` 里。结果：任何「不在内存里」的会话都被判成「会话不存在」，只有当前活着的能切（用户报的「老的都切不动」就是这个） |
+| 列一批存在的会话 | `const snaps = await sessionPersistence.list()`；`snaps.map(s => s.header.id)` | 同上：读 `s.id` 会得到一集空的 → 列表把所有冷会话都藏掉（0.3.9 就踩了这个，`/dsh ls` 只剩当前一条） |
+| 改会话标题（持久） | `ctx.get('sessionTitle').rename(session, title)` —— **同步**，要求 `session` 是 `ctx.sessions.get(id)` 里那个**活动**实例，内部 append 一条 `session/title` 事件 | `sessionPersistence.update()` **不存在**（`if (svc?.method)` 又一次静默空转），改名只在内存里活到重启 |
+
+**这一课（踩了三次，写死在这里）**：对着可选服务写 `if (svc?.method)` 之前，光核**方法名**不够，
+要连**返回形状**和**参数签名**一起核（`list()` 给快照而不是 header、`rename()` 要活动 session 且同步）。
+防御式调用把「名字写错」变成**静默失效**，比直接崩更难查 —— 如果一时核不了，就让它在拿不到时
+**明确报错或记一条日志**，别悄悄当成功。
 
 ## 长消息分片与代码块
 
