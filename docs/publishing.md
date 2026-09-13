@@ -3,13 +3,26 @@
 本仓库是**唯一源码**：DSH 侧插件在根目录，AstrBot 插件在 `astrbot_plugin_dsh/`。
 AstrBot 插件另有一个**镜像仓库**，用 `scripts/sync-plugin-mirror.mjs` 同步。
 
-## 已发布（0.2.0）
+## 已发布
 
 | 产物 | 地址 |
 |---|---|
 | DSH 侧插件（源码仓库） | https://github.com/CCYellowStar2/dsh-astrbot-ingress |
 | AstrBot 插件（镜像仓库） | https://github.com/CCYellowStar2/astrbot_plugin_dsh |
-| npm 包 | `dsh-astrbot-ingress` —— **尚未发布**（npm 账号未注册）。**非必须**：DSH 的 `dsh plugin --profile web add github:CCYellowStar2/dsh-astrbot-ingress` 直接走 pnpm 的 git 安装即可 |
+| npm 包 | [`dsh-astrbot-ingress`](https://www.npmjs.com/package/dsh-astrbot-ingress) —— **已发布**（2026-09-13 首发 0.3.10）。也仍可 `dsh plugin --profile web add github:CCYellowStar2/dsh-astrbot-ingress` 走 git 安装 |
+| DSH 插件市场 | awesome-dsh-plugin PR [#4991](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/4991)（CI check 通过，等人工合并） |
+
+### npm 发布注意（本机实测踩过的）
+
+- **本机默认源是淘宝镜像**（`~/.npmrc` 里 `registry=https://registry.npmmirror.com/`）：装包快，但它
+  **只读、不能发**。登录/发布都要显式加 `--registry=https://registry.npmjs.org/`。
+- **账号开了 2FA，npm 要求发布带一次性验证码**：普通 token 会报
+  `E403 … Two-factor authentication or granular access token with bypass 2fa enabled is required to publish packages`。
+  解法二选一：① `npm publish --registry=https://registry.npmjs.org/ --otp=<6 位码>`；
+  ② 在 npmjs.com 建一个勾了 **Bypass 2FA** 的 **Granular Access Token**（read/write），
+  `npm config set //registry.npmjs.org/:_authToken=<token>` —— 之后就能无交互发布（本项目现用这个）。
+- 发布命令：`npm publish --registry=https://registry.npmjs.org/`（版本号取自 `package.json`，
+  与 Release/tarball 同源）。
 
 元数据已填：`LICENSE` 版权行 / `package.json` 的 `author`·`repository`·`homepage`·`bugs` /
 `astrbot_plugin_dsh/metadata.yaml` 的 `author`·`repo`。README 之间用绝对 URL 互相链接
@@ -53,14 +66,17 @@ AstrBot 插件另有一个**镜像仓库**，用 `scripts/sync-plugin-mirror.mjs
    核对（不能只看大小）：下载固定链接、解包看 `package.json` 的 `version` 与本版新增的符号是否在
    `lib/index.js` 里。`*.tgz` 已在 `.gitignore` 里，不会误提交。
 
-6. 发 npm（**可选**，前提是注册了 npm 账号并 `npm login`）：
+6. 发 npm（**可选**，但既然已经发了就顺手跟上；前提是本机 `~/.npmrc` 里有官方源的 token）：
 
    ```bash
-   npm publish --access public
+   npm publish --registry=https://registry.npmjs.org/
    ```
 
+   **必须带 `--registry`**：本机默认源是淘宝镜像，它不能发（详见上面「npm 发布注意」）。
+   账号 2FA + 细粒度 token（Bypass 2FA）已经配好，所以这一步不用再给验证码。
    没发 npm 也能正常用：`dsh plugin --profile web add github:CCYellowStar2/dsh-astrbot-ingress`
-   会由 pnpm 直接从 git 装。npm 的好处只是版本号可查、`npx` 一行装、以及出现在 npm 搜索里。
+   会由 pnpm 直接从 git 装。npm 的好处是版本号可查、一行装、以及市场页推荐它（预构建产物免
+   `allowBuilds` 授权）。
 
 ## 纪律
 

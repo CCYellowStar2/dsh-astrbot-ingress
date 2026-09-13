@@ -55,7 +55,10 @@ services:
 ### 1. DSH 侧插件
 
 ```bash
-# 从 GitHub 直接装（plugin add 转发给 pnpm，支持 github: / git+https: / 本地路径）
+# npm（推荐：预构建产物，不用为构建脚本额外授权）
+dsh plugin --profile web add dsh-astrbot-ingress
+
+# 或从 GitHub 直接装（plugin add 转发给 pnpm，支持 github: / git+https: / 本地路径）
 dsh plugin --profile web add github:CCYellowStar2/dsh-astrbot-ingress
 
 # 或先 clone，再装本地目录
