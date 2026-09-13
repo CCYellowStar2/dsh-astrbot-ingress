@@ -1,6 +1,28 @@
 # Changelog
 
+## 0.3.10 — 2026-09-12
+
+### 修复
+
+- **「老会话都切不动 / 报会话不存在」的真因**：`sessionPersistence.list()` 返回的是
+  `{header, revision, sizeBytes}` **快照**，不是带 `id` 的 header。`isPersisted` 里写的是
+  `h.id === sessionId` —— **永远不成立**，于是只要会话不在内存里（没在跑），`/dsh use` 一律报
+  「会话不存在」，只有当前活着的那个能切。现在用 `stat(id)` 判存在（不存在时返回 `undefined`）。
+- **修 0.3.9 的过度过滤**：同一个形状错误让 `/dsh ls` 把**所有**冷会话都藏掉了（只剩当前那一条）。
+  现在读 `snapshot.header.id`。列表判据与 `/dsh use` 依旧一致，但这次是「能切的都列出来」。
+- **`/dsh rename` 从来没持久化过**：它调的是 `sessionPersistence.update()` —— 这个方法**不存在**，
+  又是一次「`if (svc?.method)` 静默空转」，改名只在内存里活到重启。现在走真正的
+  `sessionTitle.rename(session, title)`（要求会话是活动的那一个；它 append 一条 `session/title`
+  事件，durable）。
+- 顺带把插件里**所有**宿主服务调用对着 DSH 源码核了一遍（`sessions` / `agents` /
+  `workspaceRegistry` / `sessionPersistence` / `sessionController` / `sessionProjections` /
+  `permissionPresets` / `commands` / `attachments` / `skills` / `sessionTitle`），
+  方法名与签名现在都能对上。
+
 ## 0.3.9 — 2026-09-12
+
+> 归因更正（见 0.3.10）：这一版把「老会话切不动」归给了「归档幽灵」，
+> 真正的原因其实是 `isPersisted` 读错了 `list()` 的返回形状；归档过滤本身是对的，保留。
 
 ### 修复
 
