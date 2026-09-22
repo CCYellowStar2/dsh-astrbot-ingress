@@ -21,8 +21,21 @@ AstrBot 插件另有一个**镜像仓库**，用 `scripts/sync-plugin-mirror.mjs
   解法二选一：① `npm publish --registry=https://registry.npmjs.org/ --otp=<6 位码>`；
   ② 在 npmjs.com 建一个勾了 **Bypass 2FA** 的 **Granular Access Token**（read/write），
   `npm config set //registry.npmjs.org/:_authToken=<token>` —— 之后就能无交互发布（本项目现用这个）。
+- **发布必须走本机代理 `127.0.0.1:7890`（FlClash），否则上传被掐**（2026-09-22 实测）：
+  直连时**读全好、只有上传挂** —— DNS 正常、连读 10 次元数据 10/10 成功（约 180ms）、
+  下载 100KB tarball 3/3 成功，但 `npm publish` 的 PUT 每次 `ECONNRESET` / `ETIMEDOUT`。
+  本机 npm 的 `proxy` / `https-proxy` 都是 `null`，所以小请求能混过去、大上传不行。
+  加上代理后**一次成功**。⇒ 发布命令固定用：
+
+  ```bash
+  npm publish --registry=https://registry.npmjs.org/ \
+    --proxy=http://127.0.0.1:7890 --https-proxy=http://127.0.0.1:7890
+  ```
+
+  （排查思路可复用：先 `Resolve-DnsName` → 再连读多次 GET → 再下一个大文件；**读得通不代表发得出去**，
+  要看 PUT。本机代理端口用 `Get-NetTCPConnection -State Listen` 扫一下就知道。）
 - 发布命令：`npm publish --registry=https://registry.npmjs.org/`（版本号取自 `package.json`，
-  与 Release/tarball 同源）。
+  与 Release/tarball 同源）。发完等约 1 分钟再 `npm view` 核对 —— 刚发完可能还是旧版本号（边缘缓存）。
 
 元数据已填：`LICENSE` 版权行 / `package.json` 的 `author`·`repository`·`homepage`·`bugs` /
 `astrbot_plugin_dsh/metadata.yaml` 的 `author`·`repo`。README 之间用绝对 URL 互相链接
@@ -69,11 +82,14 @@ AstrBot 插件另有一个**镜像仓库**，用 `scripts/sync-plugin-mirror.mjs
 6. 发 npm（**可选**，但既然已经发了就顺手跟上；前提是本机 `~/.npmrc` 里有官方源的 token）：
 
    ```bash
-   npm publish --registry=https://registry.npmjs.org/
+   npm publish --registry=https://registry.npmjs.org/ \
+     --proxy=http://127.0.0.1:7890 --https-proxy=http://127.0.0.1:7890
    ```
 
    **必须带 `--registry`**：本机默认源是淘宝镜像，它不能发（详见上面「npm 发布注意」）。
+   **也必须带 `--proxy/--https-proxy`**：直连时读得通、上传被 `ECONNRESET` 掐掉（同上一节实测）。
    账号 2FA + 细粒度 token（Bypass 2FA）已经配好，所以这一步不用再给验证码。
+   发完等约 1 分钟 `npm view dsh-astrbot-ingress version --registry=https://registry.npmjs.org/` 核对。
    没发 npm 也能正常用：`dsh plugin --profile web add github:CCYellowStar2/dsh-astrbot-ingress`
    会由 pnpm 直接从 git 装。npm 的好处是版本号可查、一行装、以及市场页推荐它（预构建产物免
    `allowBuilds` 授权）。
