@@ -1,6 +1,6 @@
 {
   "name": "dsh-astrbot-ingress",
-  "version": "0.3.15",
+  "version": "0.3.16",
   "description": "HTTP ingress that lets AstrBot drive DeepSeek Harness agents (OneBot / official IM via AstrBot).",
   "license": "MIT",
   "author": "CCYellowStar2",

@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.3.16 — 2026-09-24
+
+### 修复
+
+- **群里「@机器人 + 自己直接发一张图」会被当成 DSH 续聊接管**，哪怕 `bound_media_passthrough`
+  和 `official_at_continue` 都关着。原因：官方通道那条「引用一张图 + @机器人」的特例
+  （AstrBot 不建 `Reply`，被引附件只能从原始 payload 的 `msg_elements[].attachments[]` 里捡）
+  用的是 `_has_inbound_media()` —— 它把**本条消息自带的附件**和**被引消息里的附件**混在一起，
+  于是「自己发的图」也满足了条件。那条分支还完全不看 `bound_media_passthrough`，所以关掉也没用。
+- 修法：新增 `_has_quoted_media()`，只看**被引消息**（aiocqhttp 看 `Reply` 段里的组件，
+  官方通道看 `msg_elements[].attachments[]`），那条特例改用它。于是：
+
+  | 场景 | 之前 | 现在 |
+  |---|---|---|
+  | `@机器人` + 本条直接带一张图 | 接住 ❌ | **不接住** ✅（`bound_media_passthrough` 打开时才会接住） |
+  | `@机器人` + 引用一条带图的消息 | 接住 | 接住（特例保留） |
+  | `@机器人` + 只有文字 | 不接住 | 不接住 |
+
+  容器内探针验证（`D:\dswk\.dsh-inbox\capture_media_probe.py`）：上表三行 + 开关打开那行都符合预期。
+
 ## 0.3.15 — 2026-09-22
 
 ### 修复
