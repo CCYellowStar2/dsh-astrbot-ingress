@@ -13,7 +13,7 @@ from pathlib import Path
 
 from astrbot.api import AstrBotConfig, logger
 from astrbot.api.event import AstrMessageEvent, filter
-from astrbot.api.star import Context, Star, register
+from astrbot.api.star import Context, Star, StarTools, register
 from astrbot.core.message.components import At, File, Image, Plain, Reply, Video
 
 
@@ -151,10 +151,13 @@ class DshBridgePlugin(Star):
         # 候选都不通时，在聊天里提醒一次就够
         self._url_hint_needed = False
         self._url_hint_shown = False
-        self._quote_file = Path("/AstrBot/data/plugin_data/astrbot_plugin_dsh/quoted_ids.json")
-        if not Path("/AstrBot/data").exists():
-            self._quote_file = Path("data/plugin_data/astrbot_plugin_dsh/quoted_ids.json")
-        self._load_quote_ids()
+        self._quote_file: Path | None = None
+        try:
+            self._quote_file = StarTools.get_data_dir("astrbot_plugin_dsh") / "quoted_ids.json"
+        except (OSError, RuntimeError) as exc:
+            logger.warning("DSH quote index unavailable; using memory only: %s", exc)
+        else:
+            self._load_quote_ids()
         self._install_botpy_raw_payload_shim()
 
     def _install_botpy_raw_payload_shim(self) -> None:
@@ -672,6 +675,8 @@ class DshBridgePlugin(Star):
             self._quote_texts = []
 
     def _save_quote_ids(self) -> None:
+        if self._quote_file is None:
+            return
         try:
             self._quote_file.parent.mkdir(parents=True, exist_ok=True)
             payload = {
