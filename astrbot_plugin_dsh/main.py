@@ -1039,6 +1039,17 @@ class DshBridgePlugin(Star):
             return body[len(cmd):].strip()
         return None
 
+    def _qq_private_dsh_mode(self, event: AstrMessageEvent) -> bool:
+        if event.get_group_id() or event.get_platform_name() not in {"qq_official", "qq_official_webhook"}:
+            return False
+        raw = getattr(getattr(event, "message_obj", None), "raw_message", None)
+        data = getattr(raw, "raw_data", None)
+        if not isinstance(data, dict):
+            data = self._official_raw_payload(event)
+        scene = data.get("message_scene") if isinstance(data, dict) else None
+        ext = scene.get("ext") if isinstance(scene, dict) else None
+        return isinstance(ext, list) and "dsh_mode=1" in ext
+
     def _should_capture(self, event: AstrMessageEvent, text: str) -> tuple[bool, str]:
         if not self._enabled():
             return False, ""
@@ -1061,6 +1072,8 @@ class DshBridgePlugin(Star):
             return True, (text or "").strip() or "请查看附件"
         if not text and not self._has_inbound_media(event):
             return False, ""
+        if self._qq_private_dsh_mode(event):
+            return True, text.strip() or "请查看附件"
         if self._looks_like_approval(text) and self._umo_is_bound(self._convo_key(event)):
             return True, text.strip()
         if group and bool(self._cfg("official_at_continue", True)) \
