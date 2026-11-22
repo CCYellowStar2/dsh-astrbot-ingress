@@ -88,7 +88,7 @@ Token 写在 `%DSH_HOME%/dsh-astrbot-ingress/config.json`（Linux/macOS 通常�
 `package.json` 的 `engines.dsh` 声明了兼容范围：
 
 ```json
-"dsh": "^0.1.2-rc.1 || ^0.1.5-rc.3 || ^0.1.7-rc.1 || ^0.2.0-rc.1"
+"dsh": "^0.1.2-rc.1 || ^0.1.5-rc.3 || ^0.1.7-rc.1 || >=0.2.0-rc.1 <0.3.0"
 ```
 
 实测通过：DSH `0.1.2-rc.1` / `0.1.5-rc.3` / `0.1.7-rc.1` / `0.2.0-rc.2`（当前桌面版）。
