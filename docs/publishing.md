@@ -43,9 +43,16 @@ AstrBot 插件另有一个**镜像仓库**，用 `scripts/sync-plugin-mirror.mjs
 
 ## 发新版本
 
-1. **三处版本一起改**：`package.json` 的 `version`、`astrbot_plugin_dsh/metadata.yaml` 的
-   `version`、`CHANGELOG.md` 新增版本小节。`metadata.yaml` 按 AstrBot 官方示例写**纯语义化版本**
-   （`0.2.1`，不带 `v`——市场用它比对版本号，带前缀可能判不出「已是最新」）。
+1. **版本号按两条线走**（2026-11-22 起）：
+   - **DSH 侧**（`package.json` 的 `version`）：只改这一侧时，只需 npm publish + GitHub Release，
+     **不必动** `metadata.yaml`。
+   - **AstrBot 侧**（`astrbot_plugin_dsh/metadata.yaml` 的 `version` + `main.py` 的 `@register`）：
+     只改这一侧时，只需发市场 + 镜像仓库。
+   - 两侧都改时，**两个版本号各自加一**，不再要求同号；`CHANGELOG.md` 里写清哪一节属于哪一侧。
+   - `metadata.yaml` 仍写**纯语义化版本**（`0.4.0`，不带 `v`——市场用它比对版本号，
+     带前缀可能判不出「已是最新」）。
+   - 代价要记住：**市场已发布版本可能落后于仓库最新**（在审期间）。用户问“为什么仓库是 X
+     市场是 Y”时，答案就是这条。
 2. 跑测试：`npm test`（纯函数单测）与 `npm pack --dry-run`（确认 tarball 内容）。
 3. 推源码仓库：
 

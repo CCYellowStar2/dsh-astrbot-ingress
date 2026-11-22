@@ -83,6 +83,29 @@ Token 写在 `%DSH_HOME%/dsh-astrbot-ingress/config.json`（Linux/macOS 通常�
 `token` 留空即可（自动读上面的信标文件）；**AstrBot 在容器里**：填 `http://host.docker.internal:3188`
 与手抄的 token。插件自身的说明见 [`astrbot_plugin_dsh`](https://github.com/CCYellowStar2/astrbot_plugin_dsh)。
 
+## 支持的 DSH 版本
+
+`package.json` 的 `engines.dsh` 声明了兼容范围：
+
+```json
+"dsh": "^0.1.2-rc.1 || ^0.1.5-rc.3 || ^0.1.7-rc.1 || ^0.2.0-rc.1"
+```
+
+实测通过：DSH `0.1.2-rc.1` / `0.1.5-rc.3` / `0.1.7-rc.1` / `0.2.0-rc.2`（当前桌面版）。
+不满足时 DSH 的插件管理器会**拒绝安装或启用**并给出提示 —— 那说明该升级插件、或该等适配，
+不要绕过这条检查。
+
+> 别把这个范围“简化”成 `>=0.1.2-rc.1`：按 semver 的预发布规则，它**匹配不到 `0.2.0-rc.2`**，
+> 会把当前正在跑的版本挡在门外。这里是逐档预发布显式锚定的。
+
+## 版本号：两条线
+
+- **DSH 侧**（npm `dsh-astrbot-ingress`）：`package.json` 的 `version`，走 `0.3.x`。
+- **AstrBot 侧**（市场 `astrbot_plugin_dsh`）：`astrbot_plugin_dsh/metadata.yaml` 与
+  `main.py` 的 `@register`，从 `0.4.0` 起独立走。
+
+两侧**不再强求同号**：分开分发、分别升级。注意**市场里的版本可能落后于仓库最新**（要等审核）。
+
 ## 配置
 
 ### DSH 侧（profile 的 `cordis.patch.yml`）
