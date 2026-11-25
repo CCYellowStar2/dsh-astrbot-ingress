@@ -1,3 +1,4 @@
+import ast
 import base64
 import json
 import os
@@ -242,22 +243,44 @@ class DshBridgePlugin(Star):
         except Exception:  # noqa: BLE001 - 拿不到就当没有被引附件
             return False
 
-    def _is_bot_mention(self, event: AstrMessageEvent) -> bool:
-        """这条消息是否 @ 了机器人（官方适配器对 @ 场景会补一个指向 self_id 的 At）。"""
+    def _mention_targets(self, event: AstrMessageEvent) -> tuple[bool, bool]:
+        """合并 At 段和官方 mentions，分别判断是否 @ 了自己、是否 @ 了别人。"""
+        own_ids = {"qq_official"}
         try:
-            self_id = str(event.get_self_id() or "")
+            self_id = event.get_self_id()
         except Exception:  # noqa: BLE001
-            self_id = ""
-        chain = list(getattr(getattr(event, "message_obj", None), "message", None) or [])
-        for seg in chain:
-            if not isinstance(seg, At):
-                continue
-            qq = str(getattr(seg, "qq", "") or "")
-            if not qq:
-                continue
-            if not self_id or qq == self_id or qq == "qq_official":
-                return True
-        return False
+            self_id = None
+        if self_id:
+            own_ids.add(str(self_id))
+
+        chain = getattr(getattr(event, "message_obj", None), "message", None) or []
+        targets = {str(seg.qq) for seg in chain if isinstance(seg, At) and seg.qq}
+        payload = self._official_raw_payload(event) or {}
+        mentions = payload.get("mentions")
+        if isinstance(mentions, str) and len(mentions) <= 16384:
+            # 适配器有时保留 Python 列表的 repr；逐项读取以保留混合 @。
+            try:
+                mentions = json.loads(mentions)
+            except (ValueError, RecursionError):
+                try:
+                    mentions = ast.literal_eval(mentions)
+                except (ValueError, SyntaxError, RecursionError):
+                    mentions = None
+
+        mentioned_self = False
+        if isinstance(mentions, list):
+            for item in mentions:
+                if not isinstance(item, dict):
+                    continue
+                target = str(item.get("id") or "")
+                if target:
+                    targets.add(target)
+                # bot 只代表账号类型；is_you 才标识当前机器人。
+                if item.get("is_you") is True:
+                    mentioned_self = True
+                    if target:
+                        own_ids.add(target)
+        return mentioned_self or bool(targets & own_ids), bool(targets - own_ids)
 
     def _inbound_share_dir(self, umo: str = "") -> Path | None:
         """AstrBot 能写、且 DSH 也看得到的入站暂存目录（拿不到就返回 None）。
@@ -1009,24 +1032,29 @@ class DshBridgePlugin(Star):
             return group in groups and (not users or sender in users)
         return sender in users
 
+    def _explicit_command_payload(self, text: str) -> str | None:
+        body = (text or "").strip().removeprefix("/")
+        cmd = self._command().lower()
+        if body.lower() == cmd or body.lower().startswith(cmd + " "):
+            return body[len(cmd):].strip()
+        return None
+
     def _should_capture(self, event: AstrMessageEvent, text: str) -> tuple[bool, str]:
         if not self._enabled():
             return False, ""
-        # 「引用 DSH 的回复 = 续聊」，但**@了别人就不算**：那是在跟那个人说话。
-        # 这条判断不能省 —— 「引的是不是 DSH 的正文」只能按内容认，别人把正文复制一遍再被引用
-        # 就分不出来了（实测踩过）。
-        if self._is_dsh_quote(event) and not self._mentions_someone_else(event):
+        payload = self._explicit_command_payload(text)
+        if payload is not None:
+            if not payload and self._has_inbound_media(event):
+                return True, "请查看附件"
+            return True, payload or "status"
+
+        group = bool(event.get_group_id())
+        at_self, at_other = self._mention_targets(event)
+        # 明确命令已在上面处理；群里对别人说的话不能被后面的自动分支重新接走。
+        if group and at_other:
+            return False, ""
+        if not at_other and self._is_dsh_quote(event):
             return True, (text or "").strip() or ("请查看附件" if self._has_inbound_media(event) else "(继续)")
-        # 官方通道：AstrBot 不建 Reply，「引用一张图/文件 + @机器人」也接住
-        # （附件由 `_official_quoted_media_segments` 从原始 payload 里取）。
-        # 注意这里必须用 `_has_quoted_media`（只看被引消息）而不是 `_has_inbound_media`：
-        # 后者会把「@机器人 + 自己直接发一张图」也吞掉 —— 那种是 `bound_media_passthrough`
-        # 的开关范围，用户把它关掉就是不想被接管（2026-09-24 实测踩到）。
-        if self._is_official_qq(event) \
-            and self._is_bot_mention(event) \
-            and self._has_quoted_media(event) \
-            and self._umo_is_bound(self._convo_key(event)):
-            return True, (text or "").strip() or "请查看附件"
         if bool(self._cfg("bound_media_passthrough", True)) \
             and self._has_inbound_media(event) \
             and self._umo_is_bound(self._convo_key(event)):
@@ -1035,21 +1063,12 @@ class DshBridgePlugin(Star):
             return False, ""
         if self._looks_like_approval(text) and self._umo_is_bound(self._convo_key(event)):
             return True, text.strip()
-        # 官方群聊：能收到就说明是被 @ 的，已绑定会话里直接当续聊（不必 /dsh 或引用）
-        if bool(self._cfg("official_at_continue", True)) \
+        if group and bool(self._cfg("official_at_continue", True)) \
             and self._is_official_qq(event) \
-            and self._is_bot_mention(event) \
+            and at_self \
             and self._umo_is_bound(self._convo_key(event)):
             return True, text.strip() or "请查看附件"
-        cmd = self._command().lower()
-        lowered = text.strip()
-        body = lowered[1:] if lowered.startswith("/") else lowered
-        if body.lower() == cmd or body.lower().startswith(cmd + " "):
-            payload = body[len(cmd):].strip()
-            if not payload and self._has_inbound_media(event):
-                return True, "请查看附件"
-            return True, payload or "status"
-        if not event.get_group_id() and bool(self._cfg("private_passthrough", False)):
+        if not group and bool(self._cfg("private_passthrough", False)):
             return True, text.strip()
         return False, ""
 
@@ -1634,6 +1653,15 @@ class DshBridgePlugin(Star):
             logger.warning("[dsh] 拉取出站文件失败 %s：%s", file_name, exc)
             return None
 
+    async def _deliver_media(self, event: AstrMessageEvent, media) -> None:
+        # 官方引用可能没有消息 ID，让媒体沿用文本回复的隐藏标记。
+        chain = [Plain(text=self.OUTBOUND_TAG), media] if self._is_official_qq(event) else [media]
+        result = await self._deliver(event, event.chain_result(chain))
+        mid = getattr(result, "message_id", None) or getattr(result, "id", None)
+        if not mid and isinstance(result, dict):
+            mid = result.get("message_id") or result.get("id")
+        self._remember_outbound(mid)
+
     async def _send_outbound_file(self, event: AstrMessageEvent, src: Path, file_name: str) -> AsyncIterator[str]:
         """把本地文件发出去：图片走 Image 段、视频走 Video、其余走 File。"""
         try:
@@ -1644,7 +1672,7 @@ class DshBridgePlugin(Star):
         # 也不再需要协议端能读到的共享目录。
         if self._is_inline_image(file_name, size):
             try:
-                await self._deliver(event, event.chain_result([Image.fromFileSystem(str(src))]))
+                await self._deliver_media(event, Image.fromFileSystem(str(src)))
             except Exception as exc:
                 logger.warning("send image failed: %s", exc)
                 yield f"发送图片失败：{file_name}（{exc}）"
@@ -1663,12 +1691,12 @@ class DshBridgePlugin(Star):
             send_path = staged
         if self._is_video_delivery(file_name):
             try:
-                await self._deliver(event, event.chain_result([Video(file=send_path)]))
+                await self._deliver_media(event, Video(file=send_path))
                 return
             except Exception as exc:
                 logger.warning("send video failed, fallback to file: %s", exc)
         try:
-            await self._deliver(event, event.chain_result([File(name=file_name, file=send_path)]))
+            await self._deliver_media(event, File(name=file_name, file=send_path))
         except Exception as exc:
             logger.warning("send file failed: %s", exc)
             yield f"发送文件失败：{file_name}（{exc}）"
@@ -1701,43 +1729,6 @@ class DshBridgePlugin(Star):
         if name in {"text", "approval", "status", "error", "question"} and text_out:
             yield text_out
 
-    def _mentions_someone_else(self, event: AstrMessageEvent) -> bool:
-        """这条消息有没有 @ 到「别人」（不是机器人自己）。
-
-        为什么需要它：`_quoted_is_dsh_content` 只能按**正文内容**判断「引的是不是 DSH 的回复」，
-        所以「别人把机器人的正文复制成自己的消息、你再引用那条复制品」会被误判成续聊
-        （2026-09-20 实测踩到）。而 `@某人 + 引用` 显然是在跟那个人说话，不是跟 DSH 说话 ——
-        用这个信号把它挡掉。
-        """
-        try:
-            self_id = str(event.get_self_id() or "")
-        except Exception:  # noqa: BLE001
-            self_id = ""
-        chain = list(getattr(getattr(event, "message_obj", None), "message", None) or [])
-        for seg in chain:
-            if not isinstance(seg, At):
-                continue
-            qq = str(getattr(seg, "qq", "") or "")
-            if qq and qq != self_id and qq != "qq_official":
-                return True
-        # 官方通道：@ 的信息在原始 payload 的 `mentions` 里（AstrBot 有时把它留成字符串）
-        payload = self._official_raw_payload(event)
-        mentions = payload.get("mentions") if isinstance(payload, dict) else None
-        if isinstance(mentions, list):
-            for item in mentions:
-                if not isinstance(item, dict):
-                    continue
-                if item.get("is_you") is True or item.get("bot") is True:
-                    continue
-                if str(item.get("id") or ""):
-                    return True
-            return False
-        if isinstance(mentions, str) and mentions.strip():
-            if re.search(r"['\"]?(?:is_you|bot)['\"]?\s*:\s*True", mentions):
-                return False
-            return bool(re.search(r"['\"]?id['\"]?\s*:\s*['\"][^'\"]+['\"]", mentions))
-        return False
-
     def _is_explicit_bridge_command(self, text: str) -> bool:
         """是不是「明确在调桥」——只有这种才值得回一句「你不在白名单」。
 
@@ -1754,10 +1745,7 @@ class DshBridgePlugin(Star):
         """
         if self._looks_like_approval(text):
             return False
-        lowered = (text or "").strip().lower()
-        body = lowered[1:] if lowered.startswith("/") else lowered
-        cmd = self._command().lower()
-        return body == cmd or body.startswith(cmd + " ")
+        return self._explicit_command_payload(text) is not None
 
     @filter.event_message_type(filter.EventMessageType.ALL, priority=50)
     async def on_message(self, event: AstrMessageEvent):
